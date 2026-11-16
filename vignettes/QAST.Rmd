@@ -1,0 +1,177 @@
+---
+title: "Joint regression of survival and quality-adjusted survival with QAST"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Joint regression of survival and quality-adjusted survival with QAST}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+options(QAST.cores = 2)
+```
+
+## Quality-adjusted survival
+
+Survival time alone treats every month of life the same. In many studies,
+especially in oncology, the time a patient spends with treatment toxicity or
+after a relapse is worth less than time in good health. **Quality-adjusted
+survival** weights each period of life by a utility between 0 and 1, so the
+quality-adjusted time `qt` of a subject is never larger than the survival
+time `t`.
+
+Censoring is harder here than in ordinary survival analysis: subjects with a
+poor quality of life accumulate quality-adjusted time slowly, so censoring
+becomes informative on that scale. QAST handles this with inverse
+probability of censoring weights (IPCW), estimated by Kaplan-Meier or by a
+Cox model.
+
+QAST fits **bivariate semiparametric accelerated failure time (AFT)
+models** for `t` and `qt` jointly:
+
+* `semi_aft_fg()`: the model of Fine and Gelber (2001), for binary
+  covariates, with truncation at a time `L`;
+* `semi_aft_prop()`: the model proposed in the doctoral thesis of da Silva
+  (2026), for continuous or discrete covariates.
+
+Each fit has two components: `beta` for the survival time and `theta` for
+the quality-adjusted survival time.
+
+## Data
+
+Each subject contributes an observed time `t`, a quality-adjusted time `qt`
+(with `0 <= qt <= t`), an event indicator `status` (1 = event, 0 =
+censored) and covariates. We simulate a small study:
+
+```{r data}
+library(QAST)
+
+set.seed(2026)
+n <- 150
+d <- data.frame(
+  trt = rbinom(n, 1, 0.5),
+  sex = rbinom(n, 1, 0.4),
+  age = round(rnorm(n, 60, 8))
+)
+t_event <- rexp(n, rate = exp(-0.4 * d$trt))   # treatment lengthens survival
+t_cens  <- rexp(n, rate = 0.3)
+d$status <- as.integer(t_event <= t_cens)
+d$t  <- pmin(t_event, t_cens)
+d$qt <- d$t * runif(n, 0.5, 1)                  # utility between 0.5 and 1
+head(d)
+```
+
+The response is written with `Qsurv(time, qtime, status)` on the left-hand
+side of a formula, like `survival::Surv()`. The models do not estimate an
+intercept (their estimating equations are invariant to shifts), and factors
+enter as indicators.
+
+## Fine and Gelber model
+
+The Fine and Gelber model needs binary covariates and a truncation time `L`,
+usually a time with enough follow-up left, such as an upper quantile of the
+observed times:
+
+```{r fg}
+fit_fg <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
+                      L = quantile(d$t, 0.9), var_comp = TRUE)
+fit_fg
+```
+
+`summary()` adds the jackknife standard errors, z statistics and p-values
+for both components:
+
+```{r fg-summary}
+summary(fit_fg)
+```
+
+On the log scale (`h1 = h2 = "log"`, the defaults), `exp(coef)` is a **time
+ratio**: values above 1 mean longer times. Here the treatment lengthens
+both the survival time and the quality-adjusted survival time.
+
+## Proposed model
+
+`semi_aft_prop()` accepts continuous covariates:
+
+```{r prop}
+fit_prop <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d,
+                          var_comp = TRUE)
+coef(fit_prop)
+vcov(fit_prop, "theta")
+```
+
+`coef()` returns a matrix with the `beta` and `theta` columns; `vcov()`
+returns the covariance matrix of one component.
+
+## Intercepts
+
+The rank-based estimating equations do not change when every residual is
+shifted by the same constant, so they do not identify an intercept. Each
+fit estimates it afterwards as the mean of the distribution of the
+residuals of its component:
+
+* survival time: the mean of the Kaplan-Meier curve of
+  $h_1(T_i) - Z_i^\top\hat\beta$ (Ding and Nan, 2015);
+* quality-adjusted time: the IPCW mean
+  $n^{-1}\sum_i \delta_i r_i / \hat G(T_i)$ of
+  $r_i = h_2(Q_i) - Z_i^\top\hat\theta$ (Zhao and Tsiatis, 2000), the
+  mean of the distribution estimated by `surv_qt_fun()`.
+
+```{r intercept}
+fit_prop$intercept
+# Predicted log survival time and log quality-adjusted time
+z <- model.matrix(~ age + trt, d)[, -1]
+head(cbind(
+  log_t  = fit_prop$intercept[["beta"]]  + drop(z %*% fit_prop$beta),
+  log_qt = fit_prop$intercept[["theta"]] + drop(z %*% fit_prop$theta)
+))
+```
+
+The intercepts have no standard errors and are not part of `coef()` or
+`vcov()`.
+
+## Variance
+
+Standard errors come from the delete-1 jackknife (`var_method =
+"jackknife"`, the default) or the bootstrap (`var_method = "bootstrap"`,
+with `M` replicates). The replicates run in parallel on the physical cores;
+`options(QAST.cores = k)` sets the number of processes.
+
+## Survival curve of the quality-adjusted time
+
+`surv_qt_fun()` implements the estimator of Zhao and Tsiatis (1997) for the
+survival curve of the quality-adjusted time: each uncensored subject is
+weighted by the inverse of the Kaplan-Meier censoring survival at its
+survival time, which corrects the induced informative censoring:
+
+```{r surv-qt, fig.width = 6, fig.height = 4}
+s_qt <- surv_qt_fun(qaly = d$qt, time = d$t, status = d$status)
+ord <- order(d$qt)
+plot(d$qt[ord], s_qt[ord], type = "s", ylim = c(0, 1),
+     xlab = "Quality-adjusted survival time",
+     ylab = "Estimated survival probability")
+```
+
+## References
+
+Ding, Y. and Nan, B. (2015). Estimating mean survival time: when is it
+possible? *Scandinavian Journal of Statistics*, 42(2), 397–413.
+<https://doi.org/10.1111/sjos.12112>
+
+da Silva, A. (2026). *Regression analysis of quality-adjusted survival time
+in cancer patients admitted to intensive care units: a new estimation method*.
+Doctoral thesis, Institute of Mathematics and Statistics, University of São
+Paulo.
+
+Fine, J. P. and Gelber, R. D. (2001). Joint regression analysis of survival
+and quality-adjusted survival. *Biometrics*, 57(2), 376–382.
+<https://doi.org/10.1111/j.0006-341X.2001.00376.x>
+
+Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator for the
+distribution of quality adjusted survival time. *Biometrika*, 84(2), 339–348.
+<https://doi.org/10.1093/biomet/84.2.339>
+
+Zhao, H. and Tsiatis, A. A. (2000). Estimating mean quality adjusted
+lifetime with censored data. *Sankhyā: The Indian Journal of Statistics,
+Series B*, 62, 175–188.

@@ -1,0 +1,2 @@
+## RcppArmadillo: svd/solve/pinv (fg_affine_core.cpp) exigem LAPACK/BLAS
+PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)

@@ -1,0 +1,67 @@
+bibentry(
+  bibtype = "Manual",
+  title   = "{QAST}: Joint Regression Analysis of Survival and Quality-Adjusted Survival",
+  author  = c(person("Alan", "da Silva", comment = c(ORCID = "0000-0001-9674-9830")),
+              person("Gisela", "Tunes da Silva", comment = c(ORCID = "0000-0003-3088-3134")),
+              person("Ant\u00f4nio Carlos", "Pedroso-de-Lima", comment = c(ORCID = "0000-0003-0617-328X"))),
+  year    = "2026",
+  note    = sprintf("R package version %s", meta$Version),
+  url     = "https://codeberg.org/landsilva/QAST",
+  textVersion = paste0(
+    "da Silva, A., Tunes da Silva, G. and Pedroso-de-Lima, A. C. (2026). ",
+    "QAST: Joint Regression Analysis of Survival and ",
+    "Quality-Adjusted Survival. R package version ", meta$Version, ". ",
+    "https://codeberg.org/landsilva/QAST"
+  )
+)
+
+bibentry(
+  bibtype = "PhdThesis",
+  header  = "For the proposed model (semi_aft_prop), please also cite:",
+  title   = "Regression analysis of quality-adjusted survival time in cancer patients admitted to intensive care units: a new estimation method",
+  author  = person("Alan", "da Silva"),
+  school  = "Institute of Mathematics and Statistics, University of S\u00e3o Paulo",
+  address = "S\u00e3o Paulo",
+  year    = "2026",
+  note    = "Advisor: Gisela Tunes da Silva",
+  textVersion = paste0(
+    "da Silva, A. (2026). ",
+    "Regression analysis of quality-adjusted survival time in cancer patients admitted to intensive care units: a new estimation method. ",
+    "Doctoral thesis, Institute of Mathematics and Statistics, ",
+    "University of S\u00e3o Paulo. Advisor: Gisela Tunes da Silva."
+  )
+)
+
+bibentry(
+  bibtype = "Article",
+  header  = "For the Fine and Gelber model (semi_aft_fg), please also cite:",
+  title   = "Joint Regression Analysis of Survival and Quality-Adjusted Survival",
+  author  = c(person("Jason P.", "Fine"), person("Richard D.", "Gelber")),
+  journal = "Biometrics",
+  year    = "2001",
+  volume  = "57",
+  number  = "2",
+  pages   = "376--382",
+  doi     = "10.1111/j.0006-341X.2001.00376.x",
+  textVersion = paste0(
+    "Fine, J. P. and Gelber, R. D. (2001). Joint regression analysis of ",
+    "survival and quality-adjusted survival. Biometrics, 57(2), 376-382."
+  )
+)
+
+bibentry(
+  bibtype = "Article",
+  header  = "For the quality-adjusted survival curve (surv_qt_fun), please also cite:",
+  title   = "A Consistent Estimator for the Distribution of Quality Adjusted Survival Time",
+  author  = c(person("Hongwei", "Zhao"), person("Anastasios A.", "Tsiatis")),
+  journal = "Biometrika",
+  year    = "1997",
+  volume  = "84",
+  number  = "2",
+  pages   = "339--348",
+  doi     = "10.1093/biomet/84.2.339",
+  textVersion = paste0(
+    "Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator for the ",
+    "distribution of quality adjusted survival time. Biometrika, 84(2), 339-348."
+  )
+)

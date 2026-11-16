@@ -1,0 +1,44 @@
+Package: QAST
+Title: Joint Regression Analysis of Survival and Quality-Adjusted
+        Survival
+Version: 0.1.0
+Authors@R: c(
+    person("Alan", "da Silva", email = "alansilva@alumni.usp.br",
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-9674-9830")),
+    person("Gisela", "Tunes da Silva", role = "aut",
+           comment = c(ORCID = "0000-0003-3088-3134")),
+    person("Ant\u00f4nio Carlos", "Pedroso-de-Lima", role = "aut",
+           comment = c(ORCID = "0000-0003-0617-328X"))
+  )
+Description: Implements bivariate semi-parametric accelerated failure time
+    models for the joint regression analysis of survival time and
+    quality-adjusted survival time: the model proposed in da Silva (2026,
+    doctoral thesis, University of Sao Paulo) and the model of Fine and
+    Gelber (2001) <doi:10.1111/j.0006-341X.2001.00376.x>. Parameters are
+    estimated via rank-based estimating equations, with
+    inverse-probability-of-censoring weights for informative censoring and
+    variance estimation by jackknife or bootstrap. Also provides the
+    estimator of Zhao and Tsiatis (1997) <doi:10.1093/biomet/84.2.339> for
+    the survival curve of the quality-adjusted time.
+License: GPL (>= 3)
+URL: https://codeberg.org/landsilva/QAST
+BugReports: https://codeberg.org/landsilva/QAST/issues
+Encoding: UTF-8
+Depends: R (>= 4.0.0)
+Imports: stats, survival, minqa, subplex, dfoptim, optimx, BB, boot,
+        parallel, Rcpp
+LinkingTo: Rcpp, RcppArmadillo
+Suggests: jackknifeR, knitr, rmarkdown, testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.1
+NeedsCompilation: yes
+Packaged: 2026-11-16 14:25:06 UTC; alan
+Author: Alan da Silva [aut, cre] (ORCID:
+    <https://orcid.org/0000-0001-9674-9830>),
+  Gisela Tunes da Silva [aut] (ORCID:
+    <https://orcid.org/0000-0003-3088-3134>),
+  Antônio Carlos Pedroso-de-Lima [aut] (ORCID:
+    <https://orcid.org/0000-0003-0617-328X>)
+Maintainer: Alan da Silva <alansilva@alumni.usp.br>

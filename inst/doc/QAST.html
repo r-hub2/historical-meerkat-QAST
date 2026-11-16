@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Joint regression of survival and quality-adjusted survival with QAST</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Joint regression of survival and
+quality-adjusted survival with QAST</h1>
+
+
+
+<div id="quality-adjusted-survival" class="section level2">
+<h2>Quality-adjusted survival</h2>
+<p>Survival time alone treats every month of life the same. In many
+studies, especially in oncology, the time a patient spends with
+treatment toxicity or after a relapse is worth less than time in good
+health. <strong>Quality-adjusted survival</strong> weights each period
+of life by a utility between 0 and 1, so the quality-adjusted time
+<code>qt</code> of a subject is never larger than the survival time
+<code>t</code>.</p>
+<p>Censoring is harder here than in ordinary survival analysis: subjects
+with a poor quality of life accumulate quality-adjusted time slowly, so
+censoring becomes informative on that scale. QAST handles this with
+inverse probability of censoring weights (IPCW), estimated by
+Kaplan-Meier or by a Cox model.</p>
+<p>QAST fits <strong>bivariate semiparametric accelerated failure time
+(AFT) models</strong> for <code>t</code> and <code>qt</code>
+jointly:</p>
+<ul>
+<li><code>semi_aft_fg()</code>: the model of Fine and Gelber (2001), for
+binary covariates, with truncation at a time <code>L</code>;</li>
+<li><code>semi_aft_prop()</code>: the model proposed in the doctoral
+thesis of da Silva (2026), for continuous or discrete covariates.</li>
+</ul>
+<p>Each fit has two components: <code>beta</code> for the survival time
+and <code>theta</code> for the quality-adjusted survival time.</p>
+</div>
+<div id="data" class="section level2">
+<h2>Data</h2>
+<p>Each subject contributes an observed time <code>t</code>, a
+quality-adjusted time <code>qt</code> (with
+<code>0 &lt;= qt &lt;= t</code>), an event indicator <code>status</code>
+(1 = event, 0 = censored) and covariates. We simulate a small study:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(QAST)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>n <span class="ot">&lt;-</span> <span class="dv">150</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">trt =</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.5</span>),</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>  <span class="at">sex =</span> <span class="fu">rbinom</span>(n, <span class="dv">1</span>, <span class="fl">0.4</span>),</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>  <span class="at">age =</span> <span class="fu">round</span>(<span class="fu">rnorm</span>(n, <span class="dv">60</span>, <span class="dv">8</span>))</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>)</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>t_event <span class="ot">&lt;-</span> <span class="fu">rexp</span>(n, <span class="at">rate =</span> <span class="fu">exp</span>(<span class="sc">-</span><span class="fl">0.4</span> <span class="sc">*</span> d<span class="sc">$</span>trt))   <span class="co"># treatment lengthens survival</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>t_cens  <span class="ot">&lt;-</span> <span class="fu">rexp</span>(n, <span class="at">rate =</span> <span class="fl">0.3</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>d<span class="sc">$</span>status <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(t_event <span class="sc">&lt;=</span> t_cens)</span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>d<span class="sc">$</span>t  <span class="ot">&lt;-</span> <span class="fu">pmin</span>(t_event, t_cens)</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>d<span class="sc">$</span>qt <span class="ot">&lt;-</span> d<span class="sc">$</span>t <span class="sc">*</span> <span class="fu">runif</span>(n, <span class="fl">0.5</span>, <span class="dv">1</span>)                  <span class="co"># utility between 0.5 and 1</span></span>
+<span id="cb1-15"><a href="#cb1-15" tabindex="-1"></a><span class="fu">head</span>(d)</span>
+<span id="cb1-16"><a href="#cb1-16" tabindex="-1"></a><span class="co">#&gt;   trt sex age status         t        qt</span></span>
+<span id="cb1-17"><a href="#cb1-17" tabindex="-1"></a><span class="co">#&gt; 1   1   0  60      0 0.7732030 0.4164534</span></span>
+<span id="cb1-18"><a href="#cb1-18" tabindex="-1"></a><span class="co">#&gt; 2   1   0  63      1 0.5954095 0.4841655</span></span>
+<span id="cb1-19"><a href="#cb1-19" tabindex="-1"></a><span class="co">#&gt; 3   0   1  68      1 1.9495377 1.3152856</span></span>
+<span id="cb1-20"><a href="#cb1-20" tabindex="-1"></a><span class="co">#&gt; 4   0   0  64      0 1.5068590 0.9138281</span></span>
+<span id="cb1-21"><a href="#cb1-21" tabindex="-1"></a><span class="co">#&gt; 5   1   1  65      1 0.9876141 0.9606600</span></span>
+<span id="cb1-22"><a href="#cb1-22" tabindex="-1"></a><span class="co">#&gt; 6   0   1  69      1 0.2450495 0.2227288</span></span></code></pre></div>
+<p>The response is written with <code>Qsurv(time, qtime, status)</code>
+on the left-hand side of a formula, like <code>survival::Surv()</code>.
+The models do not estimate an intercept (their estimating equations are
+invariant to shifts), and factors enter as indicators.</p>
+</div>
+<div id="fine-and-gelber-model" class="section level2">
+<h2>Fine and Gelber model</h2>
+<p>The Fine and Gelber model needs binary covariates and a truncation
+time <code>L</code>, usually a time with enough follow-up left, such as
+an upper quantile of the observed times:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>fit_fg <span class="ot">&lt;-</span> <span class="fu">semi_aft_fg</span>(<span class="fu">Qsurv</span>(t, qt, status) <span class="sc">~</span> trt <span class="sc">+</span> sex, <span class="at">data =</span> d,</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>                      <span class="at">L =</span> <span class="fu">quantile</span>(d<span class="sc">$</span>t, <span class="fl">0.9</span>), <span class="at">var_comp =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>fit_fg</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; Fine and Gelber (2001) semiparametric regression model</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; Call:</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, L = quantile(d$t, </span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt;     0.9), var_comp = TRUE, data = d)</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt; n = 150, number of events = 102</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt; L = 1.953, phi = identity</span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt; Coefficients:</span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt;        beta theta</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt; trt  0.6656 1.086</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; sex -0.1955 0.200</span></span>
+<span id="cb2-18"><a href="#cb2-18" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-19"><a href="#cb2-19" tabindex="-1"></a><span class="co">#&gt; Intercepts (mean of the residuals):</span></span>
+<span id="cb2-20"><a href="#cb2-20" tabindex="-1"></a><span class="co">#&gt;   beta  theta </span></span>
+<span id="cb2-21"><a href="#cb2-21" tabindex="-1"></a><span class="co">#&gt; -0.664 -1.361 </span></span>
+<span id="cb2-22"><a href="#cb2-22" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-23"><a href="#cb2-23" tabindex="-1"></a><span class="co">#&gt; Use summary() for standard errors and tests (jackknife).</span></span></code></pre></div>
+<p><code>summary()</code> adds the jackknife standard errors, z
+statistics and p-values for both components:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">summary</span>(fit_fg)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; --------------------------------------------------------------</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; Fine and Gelber (2001) semiparametric regression model</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; --------------------------------------------------------------</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; Call:</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, L = quantile(d$t, </span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt;     0.9), var_comp = TRUE, data = d)</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; n = 150, number of events = 102</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; L = 1.953, phi = identity</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; Variance: jackknife</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; Survival time component</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt;        coef exp(coef) se(coef)      z Pr(&gt;|z|)  </span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; trt  0.6656    1.9456   0.3289  2.024    0.043 *</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; sex -0.1955    0.8224   0.2372 -0.824    0.410  </span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; Intercept (Kaplan-Meier mean of the residuals): -0.664</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; --------------------------------------------------------------</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; Quality-adjusted survival time component</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt;       coef exp(coef) se(coef)     z Pr(&gt;|z|)    </span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; trt 1.0858    2.9617   0.3025 3.589 0.000332 ***</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; sex 0.2000    1.2214   0.3258 0.614 0.539311    </span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; Intercept (IPCW mean of the residuals): -1.361</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
+<p>On the log scale (<code>h1 = h2 = &quot;log&quot;</code>, the defaults),
+<code>exp(coef)</code> is a <strong>time ratio</strong>: values above 1
+mean longer times. Here the treatment lengthens both the survival time
+and the quality-adjusted survival time.</p>
+</div>
+<div id="proposed-model" class="section level2">
+<h2>Proposed model</h2>
+<p><code>semi_aft_prop()</code> accepts continuous covariates:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>fit_prop <span class="ot">&lt;-</span> <span class="fu">semi_aft_prop</span>(<span class="fu">Qsurv</span>(t, qt, status) <span class="sc">~</span> age <span class="sc">+</span> trt, <span class="at">data =</span> d,</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>                          <span class="at">var_comp =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">coef</span>(fit_prop)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt;           beta       theta</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; age 0.00347012 -0.01202984</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; trt 0.66051566  0.39909277</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">vcov</span>(fit_prop, <span class="st">&quot;theta&quot;</span>)</span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt;              age        trt</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; age 0.0006624136 0.00258076</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a><span class="co">#&gt; trt 0.0025807599 0.13939413</span></span></code></pre></div>
+<p><code>coef()</code> returns a matrix with the <code>beta</code> and
+<code>theta</code> columns; <code>vcov()</code> returns the covariance
+matrix of one component.</p>
+</div>
+<div id="intercepts" class="section level2">
+<h2>Intercepts</h2>
+<p>The rank-based estimating equations do not change when every residual
+is shifted by the same constant, so they do not identify an intercept.
+Each fit estimates it afterwards as the mean of the distribution of the
+residuals of its component:</p>
+<ul>
+<li>survival time: the mean of the Kaplan-Meier curve of <span class="math inline">\(h_1(T_i) - Z_i^\top\hat\beta\)</span> (Ding and
+Nan, 2015);</li>
+<li>quality-adjusted time: the IPCW mean <span class="math inline">\(n^{-1}\sum_i \delta_i r_i / \hat G(T_i)\)</span>
+of <span class="math inline">\(r_i = h_2(Q_i) -
+Z_i^\top\hat\theta\)</span> (Zhao and Tsiatis, 2000), the mean of the
+distribution estimated by <code>surv_qt_fun()</code>.</li>
+</ul>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>fit_prop<span class="sc">$</span>intercept</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="co">#&gt;       beta      theta </span></span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; -0.9542239 -0.3226268</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co"># Predicted log survival time and log quality-adjusted time</span></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>z <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(<span class="sc">~</span> age <span class="sc">+</span> trt, d)[, <span class="sc">-</span><span class="dv">1</span>]</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">head</span>(<span class="fu">cbind</span>(</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">log_t  =</span> fit_prop<span class="sc">$</span>intercept[[<span class="st">&quot;beta&quot;</span>]]  <span class="sc">+</span> <span class="fu">drop</span>(z <span class="sc">%*%</span> fit_prop<span class="sc">$</span>beta),</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">log_qt =</span> fit_prop<span class="sc">$</span>intercept[[<span class="st">&quot;theta&quot;</span>]] <span class="sc">+</span> <span class="fu">drop</span>(z <span class="sc">%*%</span> fit_prop<span class="sc">$</span>theta)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>))</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt;         log_t     log_qt</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; 1 -0.08550100 -0.6453243</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; 2 -0.07509064 -0.6814138</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; 3 -0.71825570 -1.1406557</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; 4 -0.73213618 -1.0925364</span></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; 5 -0.06815040 -0.7054735</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co">#&gt; 6 -0.71478558 -1.1526856</span></span></code></pre></div>
+<p>The intercepts have no standard errors and are not part of
+<code>coef()</code> or <code>vcov()</code>.</p>
+</div>
+<div id="variance" class="section level2">
+<h2>Variance</h2>
+<p>Standard errors come from the delete-1 jackknife
+(<code>var_method = &quot;jackknife&quot;</code>, the default) or the bootstrap
+(<code>var_method = &quot;bootstrap&quot;</code>, with <code>M</code> replicates).
+The replicates run in parallel on the physical cores;
+<code>options(QAST.cores = k)</code> sets the number of processes.</p>
+</div>
+<div id="survival-curve-of-the-quality-adjusted-time" class="section level2">
+<h2>Survival curve of the quality-adjusted time</h2>
+<p><code>surv_qt_fun()</code> implements the estimator of Zhao and
+Tsiatis (1997) for the survival curve of the quality-adjusted time: each
+uncensored subject is weighted by the inverse of the Kaplan-Meier
+censoring survival at its survival time, which corrects the induced
+informative censoring:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>s_qt <span class="ot">&lt;-</span> <span class="fu">surv_qt_fun</span>(<span class="at">qaly =</span> d<span class="sc">$</span>qt, <span class="at">time =</span> d<span class="sc">$</span>t, <span class="at">status =</span> d<span class="sc">$</span>status)</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>ord <span class="ot">&lt;-</span> <span class="fu">order</span>(d<span class="sc">$</span>qt)</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="fu">plot</span>(d<span class="sc">$</span>qt[ord], s_qt[ord], <span class="at">type =</span> <span class="st">&quot;s&quot;</span>, <span class="at">ylim =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>),</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;Quality-adjusted survival time&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>     <span class="at">ylab =</span> <span class="st">&quot;Estimated survival probability&quot;</span>)</span></code></pre></div>
+<p><img role="img" src="data:image/png;base64,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" /><!-- --></p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<p>Ding, Y. and Nan, B. (2015). Estimating mean survival time: when is
+it possible? <em>Scandinavian Journal of Statistics</em>, 42(2),
+397–413. <a href="https://doi.org/10.1111/sjos.12112" class="uri">https://doi.org/10.1111/sjos.12112</a></p>
+<p>da Silva, A. (2026). <em>Regression analysis of quality-adjusted
+survival time in cancer patients admitted to intensive care units: a new
+estimation method</em>. Doctoral thesis, Institute of Mathematics and
+Statistics, University of São Paulo.</p>
+<p>Fine, J. P. and Gelber, R. D. (2001). Joint regression analysis of
+survival and quality-adjusted survival. <em>Biometrics</em>, 57(2),
+376–382. <a href="https://doi.org/10.1111/j.0006-341X.2001.00376.x" class="uri">https://doi.org/10.1111/j.0006-341X.2001.00376.x</a></p>
+<p>Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator for the
+distribution of quality adjusted survival time. <em>Biometrika</em>,
+84(2), 339–348. <a href="https://doi.org/10.1093/biomet/84.2.339" class="uri">https://doi.org/10.1093/biomet/84.2.339</a></p>
+<p>Zhao, H. and Tsiatis, A. A. (2000). Estimating mean quality adjusted
+lifetime with censored data. <em>Sankhyā: The Indian Journal of
+Statistics, Series B</em>, 62, 175–188.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
