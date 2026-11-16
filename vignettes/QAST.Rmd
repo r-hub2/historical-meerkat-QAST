@@ -131,6 +131,45 @@ head(cbind(
 The intercepts have no standard errors and are not part of `coef()` or
 `vcov()`.
 
+## Predictions
+
+`predict()` returns the linear predictors (`type = "lp"`, intercept
+included) or the survival probabilities given the covariates
+(`type = "survival"`). Since the error does not depend on the covariates,
+$S(t \mid z) = S_e\{h(t) - z^\top\hat\beta\}$: the Kaplan-Meier curve of the
+residuals for the survival time and the Zhao and Tsiatis (1997) estimator
+of the residuals for the quality-adjusted time.
+
+```{r predict, fig.width = 6, fig.height = 4}
+new <- data.frame(age = c(0, 0), trt = c(0, 1))
+predict(fit_prop, new)
+tg <- seq(0.1, 3, length.out = 60)
+s <- predict(fit_prop, new, type = "survival", times = tg)
+matplot(tg, t(s$theta), type = "s", lty = 1:2, col = 1, ylim = c(0, 1),
+        xlab = "Quality-adjusted survival time",
+        ylab = "Estimated survival probability")
+legend("topright", c("trt = 0", "trt = 1"), lty = 1:2, bty = "n")
+```
+
+## Model checking
+
+`qast_pp()` draws the P-P plots of the residuals of Fine and Gelber (2001,
+Section 4). Under the model the distribution of the residuals does not
+depend on the covariates, so the distributions estimated in two covariate
+groups should lie close to the diagonal. Check the survival time component
+(a) first: the quality-adjusted diagnostic (b) assumes it is correct. In the
+Fine and Gelber model, (b) is the conditional distribution of the
+quality-adjusted residuals given the trimming required by the estimating
+function of $\theta$. Continuous covariates are discretized to form the
+groups:
+
+```{r pp, fig.width = 7, fig.height = 3.6}
+pp <- qast_pp(fit_prop, group = cut(d$age, c(-Inf, median(d$age), Inf),
+                                    labels = c("younger", "older")))
+pp
+plot(pp)
+```
+
 ## Variance
 
 Standard errors come from the delete-1 jackknife (`var_method =

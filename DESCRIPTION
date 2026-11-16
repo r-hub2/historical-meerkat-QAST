@@ -25,16 +25,16 @@ License: GPL (>= 3)
 URL: https://codeberg.org/landsilva/QAST
 BugReports: https://codeberg.org/landsilva/QAST/issues
 Encoding: UTF-8
-Depends: R (>= 4.0.0)
-Imports: stats, survival, minqa, subplex, dfoptim, optimx, BB, boot,
-        parallel, Rcpp
+Depends: R (>= 4.1.0)
+Imports: graphics, stats, survival, minqa, subplex, dfoptim, optimx,
+        BB, boot, parallel, Rcpp
 LinkingTo: Rcpp, RcppArmadillo
 Suggests: jackknifeR, knitr, rmarkdown, testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1
 NeedsCompilation: yes
-Packaged: 2026-11-16 14:25:06 UTC; alan
+Packaged: 2026-11-16 19:53:06 UTC; alan
 Author: Alan da Silva [aut, cre] (ORCID:
     <https://orcid.org/0000-0001-9674-9830>),
   Gisela Tunes da Silva [aut] (ORCID:

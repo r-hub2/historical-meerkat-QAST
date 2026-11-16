@@ -49,7 +49,14 @@ matrix with the two columns}
 \code{theta} (quality-adjusted survival time component),
 \code{intercept} and, when \code{var_comp = TRUE}, \code{var_beta},
 \code{var_theta} and the covariance matrices \code{vcov_beta} and
-\code{vcov_theta}.
+\code{vcov_theta}. It also holds \code{model}, \code{call}, \code{n},
+\code{n_events}, \code{settings} and, for \code{\link{predict.qast_fit}}
+and \code{\link{qast_pp}}, the data of the fit (\code{y}: columns
+\code{time}, \code{qtime} and \code{status}; \code{z}: covariate
+matrix), the estimated distributions of the residuals
+(\code{resid_dist}), the distinct event times of each component
+(\code{event_times}) and, for formula fits, the terms, factor levels
+and contrasts (\code{formula_info}).
 }
 \section{Intercepts}{
 

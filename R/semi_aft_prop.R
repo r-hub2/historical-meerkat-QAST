@@ -76,12 +76,14 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
                           var_method = "jackknife", data = NULL) {
 
   cl <- match.call()
+  formula_info <- NULL
 
   # --- Formula --------------------------------------------------------------
   if (inherits(t, "formula")) {
     names(cl)[names(cl) == "t"] <- ""   # Call: mostra a formula sem "t ="
     md <- .qast_model_data(t, data, parent.frame())
     t <- md$t; qt <- md$qt; status <- md$status; z <- md$z
+    formula_info <- md$info
   }
 
   # --- Validacao -------------------------------------------------------------
@@ -266,7 +268,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     betahat = betahat, thetahat = thetahat,
     vcov_beta = vcov_beta, vcov_theta = vcov_theta,
     var_comp = var_comp, var_method = var_method, M = M,
-    lt = lt, lq = lq, t = t,
+    lt = lt, lq = lq, t = t, qt = qt, formula_info = formula_info,
     settings = list(h1 = h1_name, h2 = h2_name, method = method,
                     norm_min = norm_min, cens_weight = cens_weight)
   )

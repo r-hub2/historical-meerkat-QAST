@@ -19,6 +19,7 @@ jackknife ou bootstrap. Os núcleos numéricos são escritos em C++
 | `semi_aft_prop()` | Modelo proposto na tese de doutorado de da Silva (2026, IME-USP) | contínuas ou discretas |
 | `semi_aft_fg()` | Fine e Gelber (2001) | binárias (0/1) |
 | `surv_qt_fun()` | Estimador de Zhao e Tsiatis (1997) da curva de sobrevivência do tempo ajustado por qualidade | — |
+| `qast_pp()` | P-P plots dos resíduos por grupo, diagnóstico de Fine e Gelber (2001) | grupos discretos |
 
 Nos dois modelos de regressão, `beta` descreve o tempo de sobrevivência e
 `theta` o tempo ajustado por qualidade.
@@ -98,6 +99,15 @@ fit_prop <- semi_aft_prop(Qsurv(t, qt, status) ~ idade + trt, data = d,
                           var_comp = TRUE)
 coef(fit_prop)            # matriz com as colunas beta e theta
 vcov(fit_prop, "theta")   # covariância (jackknife) do componente theta
+fit_prop$intercept        # interceptos: médias dos resíduos
+
+# Preditores lineares e sobrevivência dado z
+novo <- data.frame(idade = c(-1, 1), trt = c(1, 0))
+predict(fit_prop, novo)
+predict(fit_prop, novo, type = "survival", times = c(1, 2, 5))
+
+# Diagnóstico: P-P plots dos resíduos por grupo (Fine e Gelber, 2001)
+plot(qast_pp(fit_prop, group = d$idade > 0))
 ```
 
 Os dois modelos também aceitam vetores e uma matriz de covariáveis:
@@ -111,8 +121,10 @@ Os dois modelos também aceitam vetores e uma matriz de covariáveis:
 s_qt <- surv_qt_fun(qaly = d$qt, time = d$t, status = d$status)
 ```
 
-Os ajustes devolvem um objeto de classe `qast_fit`, com `beta`, `theta` e,
-se `var_comp = TRUE`, as variâncias e matrizes de covariância. As entradas
+Os ajustes devolvem um objeto de classe `qast_fit`, com `beta`, `theta`, os
+interceptos (`intercept`) e, se `var_comp = TRUE`, as variâncias e matrizes
+de covariância. `predict()` dá os preditores lineares (`type = "lp"`) ou as
+probabilidades de sobrevivência dado z (`type = "survival"`). As entradas
 são validadas: `NA`, tempos não positivos, `qt > t`, `status` fora de
 {0, 1} e comprimentos diferentes param com uma mensagem que indica as
 observações problemáticas.
@@ -175,6 +187,7 @@ jackknife or bootstrap. The numerical kernels are written in C++
 | `semi_aft_prop()` | Model proposed in the doctoral thesis of da Silva (2026, IME-USP) | continuous or discrete |
 | `semi_aft_fg()` | Fine and Gelber (2001) | binary (0/1) |
 | `surv_qt_fun()` | Zhao and Tsiatis (1997) estimator of the quality-adjusted survival curve | — |
+| `qast_pp()` | P-P plots of the residuals by group, Fine and Gelber (2001) diagnostic | discrete groups |
 
 In both regression models, `beta` describes survival time and `theta` the
 quality-adjusted survival time.
@@ -234,6 +247,15 @@ fit_prop <- semi_aft_prop(Qsurv(t, qt, status) ~ idade + trt, data = d,
                           var_comp = TRUE)
 coef(fit_prop)            # matrix with columns beta and theta
 vcov(fit_prop, "theta")   # (jackknife) covariance of the theta component
+fit_prop$intercept        # intercepts: means of the residuals
+
+# Linear predictors and survival given z
+new <- data.frame(idade = c(-1, 1), trt = c(1, 0))
+predict(fit_prop, new)
+predict(fit_prop, new, type = "survival", times = c(1, 2, 5))
+
+# Model checking: P-P plots of the residuals by group (Fine and Gelber, 2001)
+plot(qast_pp(fit_prop, group = d$idade > 0))
 
 # Quality-adjusted survival curve (Zhao and Tsiatis, 1997)
 s_qt <- surv_qt_fun(qaly = d$qt, time = d$t, status = d$status)
@@ -244,8 +266,11 @@ Both models also accept vectors and a covariate matrix:
 `method = "Nelder-Mead"`, `norm_min = "L2"` and `var_comp = FALSE`; with
 `var_method = "bootstrap"`, set the number of replicates in `M`.
 
-Fits return an object of class `qast_fit` with `beta`, `theta` and, when
-`var_comp = TRUE`, the variances and covariance matrices. Inputs are
+Fits return an object of class `qast_fit` with `beta`, `theta`, the
+intercepts (`intercept`) and, when `var_comp = TRUE`, the variances and
+covariance matrices. `predict()` gives the linear predictors
+(`type = "lp"`) or the survival probabilities given z
+(`type = "survival"`). Inputs are
 validated: `NA`, non-positive times, `qt > t`, `status` outside {0, 1} and
 mismatched lengths stop with a message pointing to the offending
 observations.

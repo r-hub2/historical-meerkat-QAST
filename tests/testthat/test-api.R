@@ -182,3 +182,70 @@ test_that("interceptos sem censura: medias simples, inclusive com residuos negat
   expect_equal(fit$intercept[["beta"]], mean(e), tolerance = 1e-12)
   expect_equal(fit$intercept[["theta"]], mean(r), tolerance = 1e-12)
 })
+
+test_that("predict lp: intercepto + z'coef, formula e matriz", {
+  d <- mk_api_data(n = 70, seed = 31)
+  df <- data.frame(tt = d$t, q = d$qt, ev = d$status, d$x)
+  fit <- semi_aft_prop(Qsurv(tt, q, ev) ~ idade + trt, data = df)
+  lp <- predict(fit)
+  expect_identical(dim(lp), c(70L, 2L))
+  expect_equal(unname(lp[, "beta"]),
+               unname(fit$intercept[["beta"]] + drop(d$x %*% fit$beta)))
+  new <- data.frame(idade = c(-1, 1), trt = c(1, 0))
+  expect_equal(unname(predict(fit, new, component = "theta")),
+               unname(fit$intercept[["theta"]] +
+                        drop(as.matrix(new) %*% fit$theta)))
+
+  # Matriz: colunas casadas pelo nome, em qualquer ordem
+  fm <- semi_aft_prop(d$t, d$qt, d$status, d$x)
+  expect_equal(predict(fm, d$x[1:3, c("trt", "idade")], component = "beta"),
+               predict(fm, d$x[1:3, ], component = "beta"))
+  expect_error(predict(fm, d$x[, "trt", drop = FALSE]), "lacks the columns")
+})
+
+test_that("predict survival: S(t | z) pela distribuicao dos residuos", {
+  d <- mk_api_data(n = 90, seed = 41)
+  fit <- semi_aft_prop(d$t, d$qt, d$status, d$x)
+
+  # beta: KM dos residuos avaliado no residuo de cada um (script da tese)
+  e <- log(d$t) - drop(d$x %*% fit$beta)
+  km <- survival::survfit(survival::Surv(e, d$status) ~ 1)
+  ref_t <- summary(km, times = e)$surv
+  S <- predict(fit, type = "survival", component = "beta", times = d$t)
+  expect_equal(diag(S), ref_t, tolerance = 1e-12)
+
+  # theta: Zhao e Tsiatis nos residuos, P(r > x), em [0, 1]
+  r <- log(d$qt) - drop(d$x %*% fit$theta)
+  G <- summary(survival::survfit(survival::Surv(d$t, 1 - d$status) ~ 1),
+               times = d$t)$surv
+  ok <- d$status == 1 & G > 0
+  tg <- c(0.2, 0.7, 1.5)
+  Sq <- predict(fit, d$x[1:4, ], type = "survival", component = "theta",
+                times = tg)
+  for (k in 1:4) {
+    x <- log(tg) - sum(d$x[k, ] * fit$theta)
+    ref <- vapply(x, function(xx) sum((r > xx)[ok] / G[ok]) / length(r), 0)
+    expect_equal(unname(Sq[k, ]), pmin(ref, 1), tolerance = 1e-12)
+  }
+
+  # Curvas nao crescentes em t e dentro de [0, 1]; grade padrao = eventos
+  both <- predict(fit, d$x[1:5, ], type = "survival")
+  for (m in both) {
+    expect_true(all(m >= 0 & m <= 1))
+    expect_true(all(apply(m, 1, function(v) all(diff(v) <= 1e-12))))
+  }
+  expect_identical(ncol(both$beta), length(unique(d$t[d$status == 1])))
+  expect_error(predict(fit, type = "survival", times = -1), "domain")
+})
+
+test_that("predict com fator: niveis do ajuste e erro para nivel novo", {
+  d <- mk_api_data(n = 80, seed = 51)
+  df <- data.frame(tt = d$t, q = d$qt, ev = d$status, idade = d$x[, "idade"],
+                   g = factor(rep(c("a", "b", "c"), length.out = 80)))
+  fit <- semi_aft_prop(Qsurv(tt, q, ev) ~ idade + g, data = df)
+  new <- data.frame(idade = 0, g = c("c", "a"))
+  lp <- predict(fit, new, component = "beta")
+  expect_equal(unname(lp), unname(fit$intercept[["beta"]] +
+                                    c(fit$beta[["gc"]], 0)))
+  expect_error(predict(fit, data.frame(idade = 0, g = "z")))
+})

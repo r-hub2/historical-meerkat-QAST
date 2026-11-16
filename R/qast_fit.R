@@ -48,10 +48,13 @@ Qsurv <- function(time, qtime, status) {
   mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
   if (ncol(mm) == 0L)
     stop("the formula has no covariates", call. = FALSE)
+  info <- list(terms = stats::delete.response(attr(mf, "terms")),
+               xlevels = stats::.getXlevels(attr(mf, "terms"), mf),
+               contrasts = attr(mm, "contrasts"))
   attr(mm, "assign") <- NULL
   attr(mm, "contrasts") <- NULL
   list(t = unname(y[, "time"]), qt = unname(y[, "qtime"]),
-       status = unname(y[, "status"]), z = mm)
+       status = unname(y[, "status"]), z = mm, info = info)
 }
 
 # ---------------------------------------------------------------------------
@@ -149,38 +152,66 @@ Qsurv <- function(time, qtime, status) {
 }
 
 # ---------------------------------------------------------------------------
-# Interceptos
+# Interceptos e distribuicao dos residuos
 # ---------------------------------------------------------------------------
 # As equacoes de posto sao invariantes a deslocamento e nao identificam o
-# intercepto; ele e estimado depois do ajuste como a media da distribuicao
-# dos residuos de cada componente.
+# intercepto. Depois do ajuste, a distribuicao dos residuos de cada
+# componente e estimada e guardada no qast_fit; o intercepto e a media
+# dela e predict(type = "survival") a usa em S(t | z) = S_res(h(t) - z'b).
 
-# Tempo de sobrevivencia: media da curva de Kaplan-Meier dos residuos
-# e = h1(t) - z'beta (Ding e Nan, 2015), restrita ao maior residuo
-# observado: a massa que sobra no fim da curva (maior residuo censurado)
-# fica nesse ponto. Calculada pelos saltos do KM, e nao pelo rmean do
-# survfit, que integra a partir de min(e) sem soma-lo de volta quando ha
-# residuos negativos.
-.km_mean <- function(e, status) {
+# Tempo de sobrevivencia: curva de Kaplan-Meier dos residuos
+# e = h1(t) - z'beta (degraus continuos a direita: S(x) = P(e > x)).
+.resid_dist_km <- function(e, status) {
   f <- survival::survfit(survival::Surv(e, status) ~ 1)
-  s <- f$surv
-  sum(-diff(c(1, s)) * f$time) + s[length(s)] * f$time[length(s)]
+  list(time = f$time, surv = f$surv)
 }
 
-# Tempo ajustado por qualidade: media IPCW dos residuos
-# r = h2(qt) - z'theta (Zhao e Tsiatis, 2000), a media da distribuicao
-# estimada por surv_qt_fun(): (1/n) sum status_i r_i / G(t_i), com G o KM
-# da censura na escala do tempo de sobrevivencia. G = 0 -> peso 0, como no
-# kernel de surv_qt_fun.
-.ipcw_mean <- function(r, t, status) {
+# Tempo ajustado por qualidade: distribuicao de Zhao e Tsiatis dos
+# residuos r = h2(qt) - z'theta. Cada evento recebe massa
+# 1 / (n G(t_i)), com G o KM da censura na escala do tempo de
+# sobrevivencia (G = 0 -> massa 0, como no kernel de surv_qt_fun);
+# massas de residuos empatados sao somadas.
+.resid_dist_ipcw <- function(r, t, status) {
   G <- km_weights_at(t, status)
-  w <- ifelse(status == 1 & is.finite(G) & G > 0, 1 / G, 0)
-  sum(w * r) / length(r)
+  w <- ifelse(status == 1 & is.finite(G) & G > 0, 1 / G, 0) / length(r)
+  keep <- w > 0
+  mass <- tapply(w[keep], r[keep], sum)
+  list(value = as.numeric(names(mass)), mass = unname(as.vector(mass)))
 }
 
-.qast_intercepts <- function(lt, lq, t, status, z, betahat, thetahat) {
-  c(beta  = .km_mean(lt - drop(z %*% betahat), status),
-    theta = .ipcw_mean(lq - drop(z %*% thetahat), t, status))
+# Media da curva KM (Ding e Nan, 2015), restrita ao maior residuo: a massa
+# que sobra no fim da curva (maior residuo censurado) fica nesse ponto.
+# Calculada pelos saltos, e nao pelo rmean do survfit, que integra a partir
+# de min(e) sem soma-lo de volta quando ha residuos negativos.
+.km_mean <- function(d) {
+  s <- d$surv
+  k <- length(s)
+  sum(-diff(c(1, s)) * d$time) + s[k] * d$time[k]
+}
+
+# Media IPCW (Zhao e Tsiatis, 2000): (1/n) sum status_i r_i / G(t_i)
+.ipcw_mean <- function(d) sum(d$mass * d$value)
+
+# S(x) = P(e > x) na curva KM; 1 antes do primeiro salto
+.surv_km_at <- function(d, x) {
+  idx <- findInterval(x, d$time)
+  out <- d$surv[pmax(idx, 1L)]
+  out[idx == 0L] <- 1
+  out
+}
+
+# S(x) = P(r > x) = soma das massas dos residuos > x, limitada a [0, 1]
+# (a massa total do IPCW e proxima de 1, mas nao exatamente 1)
+.surv_ipcw_at <- function(d, x) {
+  tail_mass <- rev(cumsum(rev(d$mass)))
+  idx <- findInterval(x, d$value) + 1L
+  out <- c(tail_mass, 0)[idx]
+  pmin(pmax(out, 0), 1)
+}
+
+.qast_resid_dists <- function(lt, lq, t, status, z, betahat, thetahat) {
+  list(beta  = .resid_dist_km(lt - drop(z %*% betahat), status),
+       theta = .resid_dist_ipcw(lq - drop(z %*% thetahat), t, status))
 }
 
 # ---------------------------------------------------------------------------
@@ -189,12 +220,13 @@ Qsurv <- function(time, qtime, status) {
 
 .new_qast_fit <- function(model, call, z, status, betahat, thetahat,
                           vcov_beta, vcov_theta, var_comp, var_method, M,
-                          settings, lt, lq, t) {
+                          settings, lt, lq, t, qt, formula_info = NULL) {
   nms <- colnames(z)
   names(betahat) <- names(thetahat) <- nms
+  rd <- .qast_resid_dists(lt, lq, t, status, z, betahat, thetahat)
   fit <- list(beta = betahat, theta = thetahat,
-              intercept = .qast_intercepts(lt, lq, t, status, z,
-                                           betahat, thetahat))
+              intercept = c(beta = .km_mean(rd$beta),
+                            theta = .ipcw_mean(rd$theta)))
   if (var_comp) {
     dimnames(vcov_beta) <- dimnames(vcov_theta) <- list(nms, nms)
     fit$var_beta  <- stats::setNames(diag(vcov_beta), nms)
@@ -209,6 +241,14 @@ Qsurv <- function(time, qtime, status) {
   fit$var_method <- if (var_comp) var_method else NULL
   fit$M <- if (var_comp && var_method == "bootstrap") M else NULL
   fit$settings <- settings
+  # Para predict(): covariaveis do ajuste, distribuicao dos residuos,
+  # tempos de evento (grade padrao) e, nas formulas, termos e niveis
+  fit$z <- z
+  fit$y <- cbind(time = t, qtime = qt, status = status)
+  fit$resid_dist <- rd
+  fit$event_times <- list(beta  = sort(unique(t[status == 1])),
+                          theta = sort(unique(qt[status == 1])))
+  fit$formula_info <- formula_info
   class(fit) <- "qast_fit"
   fit
 }
@@ -226,7 +266,14 @@ Qsurv <- function(time, qtime, status) {
 #' \code{theta} (quality-adjusted survival time component),
 #' \code{intercept} and, when \code{var_comp = TRUE}, \code{var_beta},
 #' \code{var_theta} and the covariance matrices \code{vcov_beta} and
-#' \code{vcov_theta}.
+#' \code{vcov_theta}. It also holds \code{model}, \code{call}, \code{n},
+#' \code{n_events}, \code{settings} and, for \code{\link{predict.qast_fit}}
+#' and \code{\link{qast_pp}}, the data of the fit (\code{y}: columns
+#' \code{time}, \code{qtime} and \code{status}; \code{z}: covariate
+#' matrix), the estimated distributions of the residuals
+#' (\code{resid_dist}), the distinct event times of each component
+#' (\code{event_times}) and, for formula fits, the terms, factor levels
+#' and contrasts (\code{formula_info}).
 #'
 #' @section Intercepts:
 #' The rank-based estimating equations are invariant to a location shift,
@@ -391,4 +438,160 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
   if (signif.stars && ncol(x$theta) > 2L)
     cat("---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
   invisible(x)
+}
+
+# ---------------------------------------------------------------------------
+# predict
+# ---------------------------------------------------------------------------
+
+# Matriz de covariaveis para predict(): formula -> model.matrix com os
+# termos, niveis e contrastes do ajuste; matriz -> colunas pelo nome (ou
+# pela posicao, se o ajuste nao tinha nomes)
+.qast_newdata_z <- function(object, newdata) {
+  if (is.null(newdata)) return(object$z)
+  p <- length(object$beta)
+  nms <- names(object$beta)
+  info <- object$formula_info
+  if (!is.null(info)) {
+    if (!is.data.frame(newdata))
+      newdata <- as.data.frame(newdata)
+    mf <- stats::model.frame(info$terms, newdata, xlev = info$xlevels,
+                             na.action = stats::na.pass)
+    z <- stats::model.matrix(info$terms, mf, contrasts.arg = info$contrasts)
+    z <- z[, colnames(z) != "(Intercept)", drop = FALSE]
+  } else {
+    z <- as.matrix(newdata)
+    if (!is.null(nms) && !is.null(colnames(z))) {
+      miss <- setdiff(nms, colnames(z))
+      if (length(miss))
+        stop("newdata lacks the columns: ", paste(miss, collapse = ", "),
+             call. = FALSE)
+      z <- z[, nms, drop = FALSE]
+    }
+  }
+  if (ncol(z) != p)
+    stop(sprintf("newdata gives %d covariate columns; the fit has %d",
+                 ncol(z), p), call. = FALSE)
+  if (!is.numeric(z)) stop("newdata covariates must be numeric", call. = FALSE)
+  if (anyNA(z)) .qast_stop_at("newdata contains NA", which(!stats::complete.cases(z)))
+  z
+}
+
+# S(t | z_k) numa grade de tempos, para um componente
+.qast_predict_surv <- function(object, z, comp, times) {
+  link <- stats::make.link(object$settings[[if (comp == "beta") "h1" else "h2"]])
+  if (is.null(times)) times <- object$event_times[[comp]]
+  if (!is.numeric(times) || anyNA(times))
+    stop("times must be a numeric vector without NA", call. = FALSE)
+  ht <- link$linkfun(times)
+  if (any(!is.finite(ht)))
+    stop(sprintf("times must be in the domain of the link \"%s\" (with log, > 0)",
+                 link$name), call. = FALSE)
+  lp <- drop(z %*% object[[comp]])
+  x <- outer(-lp, ht, `+`)          # residuo: h(t) - z'b
+  surv_at <- if (comp == "beta") .surv_km_at else .surv_ipcw_at
+  out <- matrix(surv_at(object$resid_dist[[comp]], as.vector(x)),
+                nrow = nrow(x))
+  dimnames(out) <- list(rownames(z), format(times, digits = 6L,
+                                            trim = TRUE))
+  out
+}
+
+#' Predictions from QAST fits
+#'
+#' Linear predictors and survival probabilities for the survival time
+#' (\code{beta}) and quality-adjusted survival time (\code{theta})
+#' components of a \code{"qast_fit"}.
+#'
+#' Under the model \eqn{h_1(T) = \alpha + Z^\top\beta + \varepsilon}{h1(T)
+#' = alpha + Z'beta + e}, with the error independent of the covariates,
+#' the survival function given the covariates is a shift of the residual
+#' survival function:
+#' \deqn{S(t \mid z) = P\{h_1(T) - Z^\top\beta > h_1(t) - z^\top\beta\} =
+#'   S_{e}\{h_1(t) - z^\top\hat\beta\},}{S(t | z) = S_e(h1(t) - z'beta),}
+#' with \eqn{e = h_1(T) - Z^\top\hat\beta}{e = h1(T) - Z'beta} (the
+#' intercept cancels out). \eqn{S_e}{S_e} is estimated by:
+#' \itemize{
+#'   \item \code{beta}: the Kaplan-Meier curve of the residuals
+#'     \eqn{h_1(T_i) - Z_i^\top\hat\beta}{h1(T_i) - Z_i'beta};
+#'   \item \code{theta}: the estimator of Zhao and Tsiatis (1997) applied
+#'     to the residuals \eqn{h_2(Q_i) - Z_i^\top\hat\theta}{h2(Q_i) -
+#'     Z_i'theta}, which weights each event by the inverse of the
+#'     Kaplan-Meier censoring survival at its survival time and corrects
+#'     the induced informative censoring of the quality-adjusted time.
+#'     Its total mass is close to, but not exactly, 1, so the estimates
+#'     are truncated to [0, 1].
+#' }
+#' Both use the Kaplan-Meier (marginal) censoring distribution, which
+#' assumes censoring independent of the covariates. The survival
+#' probabilities are \eqn{P(T > t \mid z)}{P(T > t | z)} (right-continuous
+#' steps). \code{surv_qt_fun()} evaluates each subject at its own
+#' residual with \eqn{\ge}{>=}, i.e. \eqn{P(r \ge r_i)}{P(r >= r_i)}.
+#'
+#' @param object Object of class \code{"qast_fit"}
+#' @param newdata Covariates to predict for. For fits from a formula, a
+#'   data frame with the covariates of the formula (factors with the
+#'   levels of the fit); for fits from a matrix, a matrix or data frame
+#'   with the columns of \code{z} (matched by name when the fit had
+#'   column names). \code{NULL} (default) uses the covariates of the fit.
+#' @param type \code{"lp"} (linear predictor including the intercept,
+#'   \code{intercept + z \%*\% coef}, on the scale of the link) or
+#'   \code{"survival"} (survival probabilities at \code{times})
+#' @param component \code{"both"}, \code{"beta"} (survival time) or
+#'   \code{"theta"} (quality-adjusted time)
+#' @param times Times at which to evaluate the survival probabilities, on
+#'   the original scale (survival time for \code{beta}, quality-adjusted
+#'   time for \code{theta}). \code{NULL} (default) uses the distinct
+#'   event times of the fit data of each component.
+#' @param ... Not used
+#' @return For \code{type = "lp"}: a vector (one component) or a matrix
+#'   with columns \code{beta} and \code{theta}. For
+#'   \code{type = "survival"}: a matrix with one row per subject of
+#'   \code{newdata} and one column per time (one component), or a list
+#'   with the matrices \code{beta} and \code{theta}.
+#' @references Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator
+#'   for the distribution of quality adjusted survival time.
+#'   \emph{Biometrika}, 84(2), 339-348. \doi{10.1093/biomet/84.2.339}
+#' @seealso \code{\link{qast_fit}} for the intercepts;
+#'   \code{\link{surv_qt_fun}}
+#' @examples
+#' set.seed(1)
+#' n <- 80
+#' d <- data.frame(age = rnorm(n), trt = rbinom(n, 1, 0.5))
+#' d$t <- rexp(n, rate = exp(-0.3 * d$trt))
+#' d$status <- rbinom(n, 1, 0.8)
+#' d$qt <- d$t * runif(n, 0.5, 1)
+#' fit <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d)
+#'
+#' new <- data.frame(age = c(0, 0), trt = c(0, 1))
+#' predict(fit, new)                       # linear predictors
+#' s <- predict(fit, new, type = "survival", times = c(0.5, 1, 2))
+#' s$beta                                  # P(T > t | z)
+#' s$theta                                 # P(Q > t | z)
+#' @export
+predict.qast_fit <- function(object, newdata = NULL,
+                             type = c("lp", "survival"),
+                             component = c("both", "beta", "theta"),
+                             times = NULL, ...) {
+  type <- match.arg(type)
+  component <- match.arg(component)
+  if (is.null(object$resid_dist))
+    stop("this fit has no stored residual distribution; refit it with ",
+         "the current version of QAST", call. = FALSE)
+  z <- .qast_newdata_z(object, newdata)
+  comps <- if (component == "both") c("beta", "theta") else component
+
+  if (type == "lp") {
+    out <- vapply(comps, function(cp)
+      object$intercept[[cp]] + drop(z %*% object[[cp]]),
+      numeric(nrow(z)))
+    if (!is.matrix(out)) out <- matrix(out, nrow = nrow(z),
+                                       dimnames = list(NULL, comps))
+    rownames(out) <- rownames(z)
+    return(if (length(comps) == 1L) out[, 1L] else out)
+  }
+
+  out <- lapply(stats::setNames(comps, comps), function(cp)
+    .qast_predict_surv(object, z, cp, times))
+  if (length(comps) == 1L) out[[1L]] else out
 }

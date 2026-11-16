@@ -42,6 +42,22 @@ head(cbind(
   log_qt = fit_prop$intercept[["theta"]] + drop(z %*% fit_prop$theta)
 ))
 
+## ----predict, fig.width = 6, fig.height = 4-----------------------------------
+new <- data.frame(age = c(0, 0), trt = c(0, 1))
+predict(fit_prop, new)
+tg <- seq(0.1, 3, length.out = 60)
+s <- predict(fit_prop, new, type = "survival", times = tg)
+matplot(tg, t(s$theta), type = "s", lty = 1:2, col = 1, ylim = c(0, 1),
+        xlab = "Quality-adjusted survival time",
+        ylab = "Estimated survival probability")
+legend("topright", c("trt = 0", "trt = 1"), lty = 1:2, bty = "n")
+
+## ----pp, fig.width = 7, fig.height = 3.6--------------------------------------
+pp <- qast_pp(fit_prop, group = cut(d$age, c(-Inf, median(d$age), Inf),
+                                    labels = c("younger", "older")))
+pp
+plot(pp)
+
 ## ----surv-qt, fig.width = 6, fig.height = 4-----------------------------------
 s_qt <- surv_qt_fun(qaly = d$qt, time = d$t, status = d$status)
 ord <- order(d$qt)

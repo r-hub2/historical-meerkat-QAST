@@ -17,6 +17,15 @@ First release.
   (Ding and Nan, 2015) and the IPCW mean of the quality-adjusted residuals
   (Zhao and Tsiatis, 2000), in `fit$intercept`, shown by `print()` and
   `summary()`.
+* `predict()` method for fits: linear predictors (`type = "lp"`) and
+  survival probabilities given the covariates (`type = "survival"`), from
+  the Kaplan-Meier curve of the survival time residuals and the Zhao and
+  Tsiatis (1997) estimator of the quality-adjusted residuals; accepts
+  `newdata` for formula and matrix fits.
+* `qast_pp()`: P-P plots of the residuals by covariate group, the
+  lack-of-fit diagnostic of Fine and Gelber (2001, Section 4), with the
+  trimmed conditional quality-adjusted distribution for `semi_aft_fg()`
+  fits; `print()` and `plot()` methods.
 * `surv_qt_fun()` implements the estimator of Zhao and Tsiatis (1997) for
   the survival curve of the quality-adjusted time.
 
