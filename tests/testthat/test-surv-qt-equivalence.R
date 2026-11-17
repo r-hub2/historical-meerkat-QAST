@@ -1,17 +1,18 @@
 # tests/testthat/test-surv-qt-equivalence.R
 #
-# Testa a equivalencia entre a implementacao original em R puro
-# (preservada aqui como oracle) e o kernel C++ otimizado.
+# Tests the equivalence between the original pure R implementation
+# (kept here as the oracle) and the optimized C++ kernel.
 #
-# O oracle reproduz fielmente o script original, inclusive os
-# comportamentos de borda que o kernel replica propositalmente:
-#   - summary(km_fit, times = time) retorna NA para tempos alem do
-#     ultimo evento -> o na.rm = TRUE do original descarta a
-#     contribuicao -> o kernel trata o peso como 0;
-#   - empates (ties) em qalys recebem a mesma probabilidade
-#     (comparacao >= do original).
+# The oracle faithfully reproduces the original script, including the
+# edge behaviors that the kernel replicates on purpose:
+#   - summary(km_fit, times = time) returns NA for times beyond the
+#     last event -> the na.rm = TRUE of the original drops the
+#     contribution -> the kernel treats the weight as 0;
+#   - ties in qalys get the same probability.
+# The comparison is > (survival P(Q > q), right-continuous, the same
+# convention as predict and the KM); the original script used >=.
 
-# Oracle: copia fiel da implementacao original em R puro
+# Oracle: original pure R implementation, with the comparison >
 surv_qt_ref <- function(QALY, object, pred_lin_qt = NULL) {
   time   <- object[, 1]
   status <- object[, 2]
@@ -23,7 +24,7 @@ surv_qt_ref <- function(QALY, object, pred_lin_qt = NULL) {
   km_fit <- survival::survfit(survival::Surv(time, 1 - status) ~ 1)
   cens_surv <- summary(object = km_fit, times = time)$surv
   pred_surv <- sapply(1:length(qalys), function(i) {
-    sum(x = ((status * (qalys >= qalys[i])) / cens_surv), na.rm = TRUE) /
+    sum(x = ((status * (qalys > qalys[i])) / cens_surv), na.rm = TRUE) /
       length(qalys)
   })
   pred_surv
@@ -40,7 +41,7 @@ gera_dados_survqt <- function(n = 50, seed = 42) {
   list(time = time, status = status, qaly = qaly, z = z1)
 }
 
-test_that("Kernel C++ equivale ao oracle em R (sem preditor linear)", {
+test_that("C++ kernel equals the R oracle (without linear predictor)", {
   d <- gera_dados_survqt()
   
   ref <- surv_qt_ref(QALY = d$qaly, object = cbind(d$time, d$status))
@@ -49,7 +50,7 @@ test_that("Kernel C++ equivale ao oracle em R (sem preditor linear)", {
   expect_equal(cpp, ref, tolerance = 1e-10)
 })
 
-test_that("Kernel C++ equivale ao oracle em R (com preditor linear)", {
+test_that("C++ kernel equals the R oracle (with linear predictor)", {
   d <- gera_dados_survqt(n = 60, seed = 7)
   
   lin_pred <- d$z * 0.2
@@ -62,9 +63,9 @@ test_that("Kernel C++ equivale ao oracle em R (com preditor linear)", {
   expect_equal(cpp, ref, tolerance = 1e-10)
 })
 
-test_that("Empates em qaly recebem a mesma probabilidade", {
+test_that("Ties in qaly get the same probability", {
   d <- gera_dados_survqt(n = 30, seed = 99)
-  # Forca empates: arredonda os QALYs para uma grade grosseira
+  # Forces ties: rounds the QALYs to a coarse grid
   d$qaly <- round(d$qaly, 1)
   
   cpp <- QAST:::surv_qt_fun(qaly = d$qaly, time = d$time, status = d$status)
@@ -72,19 +73,19 @@ test_that("Empates em qaly recebem a mesma probabilidade", {
   
   expect_equal(cpp, ref, tolerance = 1e-10)
   
-  # Verificacao direta do invariante: mesma entrada, mesma saida
+  # Direct check of the invariant: same input, same output
   if (any(duplicated(d$qaly))) {
     tab <- tapply(cpp, d$qaly, function(x) length(unique(round(x, 12))))
     expect_true(all(tab == 1))
   }
 })
 
-test_that("Tempos alem do ultimo evento do KM tem peso zero (NA do original)", {
+test_that("Times beyond the last KM event have zero weight (NA in the original)", {
   d <- gera_dados_survqt(n = 20, seed = 5)
   
-  # Forca um tempo muito grande: alem do maior tempo do KM da censura.
-  # O summary() do oracle retornaria NA e o na.rm = TRUE descartaria
-  # a contribuicao; o kernel deve replicar esse comportamento.
+  # Forces a very large time: beyond the largest time of the censoring KM.
+  # The oracle's summary() would return NA and na.rm = TRUE would drop
+  # the contribution; the kernel must replicate that behavior.
   d$time[1] <- max(d$time) * 10
   d$qaly[1] <- d$qaly[1] * 10
   
@@ -94,7 +95,7 @@ test_that("Tempos alem do ultimo evento do KM tem peso zero (NA do original)", {
   expect_equal(cpp, ref, tolerance = 1e-10)
 })
 
-test_that("Wrapper valida entradas", {
+test_that("Wrapper validates the inputs", {
   d <- gera_dados_survqt(n = 10)
   
   expect_error(
@@ -108,7 +109,7 @@ test_that("Wrapper valida entradas", {
   )
 })
 
-test_that("km_fit externo e reutilizado corretamente", {
+test_that("An external km_fit is reused correctly", {
   d <- gera_dados_survqt(n = 40, seed = 3)
   
   km_fit <- survival::survfit(survival::Surv(d$time, 1 - d$status) ~ 1)

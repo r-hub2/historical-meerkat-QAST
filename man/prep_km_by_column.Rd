@@ -2,9 +2,9 @@
 % Please edit documentation in R/km_prep.R
 \name{prep_km_by_column}
 \alias{prep_km_by_column}
-\title{KM weights for each binary covariate column}
+\title{Censoring weights of the Fine and Gelber pairs, by column}
 \usage{
-prep_km_by_column(z, t, status, use_legacy = FALSE, dedupe_cols = TRUE)
+prep_km_by_column(z, t, status, use_legacy = FALSE, group = NULL)
 }
 \arguments{
 \item{z}{Binary covariate matrix (n x p)}
@@ -15,18 +15,18 @@ prep_km_by_column(z, t, status, use_legacy = FALSE, dedupe_cols = TRUE)
 
 \item{use_legacy}{Passed to km_weights_at (reference for the tests)}
 
-\item{dedupe_cols}{If TRUE (default), computes the weights once per
-distinct column (safe by construction: identical columns give
-identical groups and weights)}
+\item{group}{Censoring partition: NULL (default; a single group, no
+stratification) or a vector of length n}
 }
 \value{
 List of length p; element j holds w0 and w1
 }
 \description{
-For each column j of z, the censoring KM weights in the groups
-\code{z[, j] == 0} (w0) and \code{z[, j] == 1} (w1). Identical columns
-define the same groups and therefore the same weights: with
-\code{dedupe_cols = TRUE}, survfit runs once per distinct column.
+Each subject has one censoring weight \eqn{\hat H_{G_i}(X_i)}{H_G(X_i)}
+from the censoring partition (Fine and Gelber, 2001), the same in every
+component of the estimating function. The kernels read it split by the
+groups of each binary column: \code{w0} (rows with \code{z[, j] == 0})
+and \code{w1} (rows with \code{z[, j] == 1}), in the original order.
 Recomputed in every variance replicate.
 }
 \keyword{internal}

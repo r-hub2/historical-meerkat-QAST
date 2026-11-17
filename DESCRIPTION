@@ -22,7 +22,8 @@ Description: Implements bivariate semi-parametric accelerated failure time
     estimator of Zhao and Tsiatis (1997) <doi:10.1093/biomet/84.2.339> for
     the survival curve of the quality-adjusted time.
 License: GPL (>= 3)
-URL: https://codeberg.org/landsilva/QAST
+URL: https://codeberg.org/landsilva/QAST,
+        https://landsilva.codeberg.page/QAST/
 BugReports: https://codeberg.org/landsilva/QAST/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
@@ -34,7 +35,7 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1
 NeedsCompilation: yes
-Packaged: 2026-11-16 19:53:06 UTC; alan
+Packaged: 2026-11-17 18:31:41 UTC; alan
 Author: Alan da Silva [aut, cre] (ORCID:
     <https://orcid.org/0000-0001-9674-9830>),
   Gisela Tunes da Silva [aut] (ORCID:

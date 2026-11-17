@@ -1,5 +1,5 @@
-# Caminhos que os demais testes nao exercitam: otimizadores, bootstrap do
-# modelo proposto, cens_weight = FALSE e a escolha do numero de workers.
+# Paths that the other tests do not exercise: optimizers, bootstrap of the
+# proposed model, cens_weight = FALSE and the choice of the number of workers.
 
 mk_cov_data <- function(n = 60, seed = 21) {
   set.seed(seed)
@@ -11,7 +11,7 @@ mk_cov_data <- function(n = 60, seed = 21) {
   list(t = t, qt = qt, status = status, z = z, x = x, L = quantile(t, 0.9))
 }
 
-test_that("todos os otimizadores aceitos produzem estimativas finitas", {
+test_that("all accepted optimizers give finite estimates", {
   d <- mk_cov_data()
   methods <- c("uobyqa", "mads", "Nelder-Mead", "subplex", "BB", "SANN",
                "bobyqa", "newuoa", "hjkb", "BFGS")
@@ -21,7 +21,7 @@ test_that("todos os otimizadores aceitos produzem estimativas finitas", {
                                             method = m))
     expect_true(all(is.finite(coef(fit_p))), info = m)
     expect_identical(fit_p$settings$method, m)
-    # FG com fast_path = FALSE: theta tambem passa pelo otimizador
+    # FG with fast_path = FALSE: theta also goes through the optimizer
     set.seed(1)
     fit_f <- suppressWarnings(semi_aft_fg(d$t, d$qt, d$status, d$z,
                                           L = d$L, method = m,
@@ -30,9 +30,9 @@ test_that("todos os otimizadores aceitos produzem estimativas finitas", {
   }
 })
 
-test_that("semi_aft_prop: bootstrap e cens_weight = FALSE", {
-  # n maior: em reamostras pequenas o coxph dos pesos IPCW pode avisar
-  # sobre separacao numa covariavel binaria (comportamento dos dados)
+test_that("semi_aft_prop: bootstrap and cens_weight = FALSE", {
+  # larger n: in small resamples the coxph of the IPCW weights may warn
+  # about separation in a binary covariate (behavior of the data)
   d <- mk_cov_data(n = 150)
   set.seed(5)
   fit_b <- semi_aft_prop(d$t, d$qt, d$status, d$x, var_comp = TRUE,
@@ -49,12 +49,12 @@ test_that("semi_aft_prop: bootstrap e cens_weight = FALSE", {
   fit_nw <- semi_aft_prop(d$t, d$qt, d$status, d$x, cens_weight = FALSE)
   expect_false(fit_nw$settings$cens_weight)
   expect_true(all(is.finite(coef(fit_nw))))
-  # sem pesos, theta usa a equacao nao ponderada: difere do ajuste IPCW
+  # without weights, theta uses the unweighted equation: it differs from the IPCW fit
   fit_w <- semi_aft_prop(d$t, d$qt, d$status, d$x)
   expect_false(isTRUE(all.equal(fit_nw$theta, fit_w$theta)))
 })
 
-test_that("semi_aft_fg: piecewise com L1 e jackknife", {
+test_that("semi_aft_fg: piecewise with L1 and jackknife", {
   d <- mk_cov_data()
   fit <- semi_aft_fg(d$t, d$qt, d$status, d$z, L = d$L, phi = "piecewise",
                      norm_min = "L1", var_comp = TRUE)
@@ -63,7 +63,7 @@ test_that("semi_aft_fg: piecewise com L1 e jackknife", {
   expect_output(print(fit), "phi = piecewise")
 })
 
-test_that(".qast_workers respeita a opcao QAST.cores e o limite do check", {
+test_that(".qast_workers honors the QAST.cores option and the check limit", {
   skip_on_os("windows")
   old_opt <- options(QAST.cores = 3L)
   old_env <- Sys.getenv("_R_CHECK_LIMIT_CORES_", unset = NA)

@@ -10,6 +10,8 @@
   type = c("lp", "survival"),
   component = c("both", "beta", "theta"),
   times = NULL,
+  se.fit = FALSE,
+  level = 0.95,
   ...
 )
 }
@@ -34,14 +36,23 @@ the original scale (survival time for \code{beta}, quality-adjusted
 time for \code{theta}). \code{NULL} (default) uses the distinct
 event times of the fit data of each component.}
 
+\item{se.fit}{If TRUE, also returns standard errors (and, for
+\code{type = "survival"}, pointwise confidence limits) from the
+variance replicates of the fit; requires \code{var_comp = TRUE}}
+
+\item{level}{Confidence level of the survival intervals}
+
 \item{...}{Not used}
 }
 \value{
 For \code{type = "lp"}: a vector (one component) or a matrix
-  with columns \code{beta} and \code{theta}. For
+  with columns \code{beta} and \code{theta}; with \code{se.fit = TRUE},
+  a list with \code{fit} and \code{se.fit} of the same shape. For
   \code{type = "survival"}: a matrix with one row per subject of
   \code{newdata} and one column per time (one component), or a list
-  with the matrices \code{beta} and \code{theta}.
+  with the matrices \code{beta} and \code{theta}; with
+  \code{se.fit = TRUE}, each matrix is replaced by a list with
+  \code{surv}, \code{se}, \code{lower} and \code{upper}.
 }
 \description{
 Linear predictors and survival probabilities for the survival time
@@ -68,11 +79,25 @@ intercept cancels out). \eqn{S_e}{S_e} is estimated by:
     Its total mass is close to, but not exactly, 1, so the estimates
     are truncated to [0, 1].
 }
-Both use the Kaplan-Meier (marginal) censoring distribution, which
-assumes censoring independent of the covariates. The survival
+The censoring is the Kaplan-Meier: within the censoring groups of the
+fit for \code{semi_aft_fg()} (\code{cens_group}; marginal without
+stratification, the default), as in the estimating function; marginal
+for \code{semi_aft_prop()}, which assumes censoring independent of the
+covariates (the fit itself uses a Cox model). The survival
 probabilities are \eqn{P(T > t \mid z)}{P(T > t | z)} (right-continuous
-steps). \code{surv_qt_fun()} evaluates each subject at its own
-residual with \eqn{\ge}{>=}, i.e. \eqn{P(r \ge r_i)}{P(r >= r_i)}.
+steps), the same convention as \code{surv_qt_fun()}.
+
+With \code{se.fit = TRUE} (fits with \code{var_comp = TRUE}), the
+prediction is recomputed in every jackknife or bootstrap replicate of
+the fit: the replicate coefficients, and the intercept and the residual
+distribution re-estimated on the data of the replicate, with the same
+censoring weights. The standard errors use the same formula as
+\code{vcov()}: the delete-1 jackknife variance or the bootstrap sample
+variance. The survival intervals are pointwise: normal
+(\eqn{\pm z_{1-\alpha/2}}{+/- z} times the standard error) for the
+jackknife, percentile for the bootstrap, truncated to [0, 1]. The
+censoring weights are re-estimated in every replicate, as in the
+variance of the coefficients.
 }
 \examples{
 set.seed(1)
@@ -88,6 +113,13 @@ predict(fit, new)                       # linear predictors
 s <- predict(fit, new, type = "survival", times = c(0.5, 1, 2))
 s$beta                                  # P(T > t | z)
 s$theta                                 # P(Q > t | z)
+
+# Standard errors and pointwise 95\% intervals (jackknife replicates)
+fit_v <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d,
+                       var_comp = TRUE)
+predict(fit_v, new, se.fit = TRUE)
+predict(fit_v, new, type = "survival", component = "theta",
+        times = c(0.5, 1), se.fit = TRUE)
 }
 \references{
 Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator

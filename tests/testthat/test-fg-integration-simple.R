@@ -12,7 +12,7 @@ gera_dados_fg <- function(n = 60, seed = 123) {
   list(t = t, qt = qt, status = status, z = z)
 }
 
-test_that("semi_aft_fg ajusta sem variancia e retorna estrutura correta", {
+test_that("semi_aft_fg fits without variance and returns the right structure", {
   d <- gera_dados_fg()
   
   fit <- semi_aft_fg(
@@ -34,7 +34,7 @@ test_that("semi_aft_fg ajusta sem variancia e retorna estrutura correta", {
   expect_true(all(is.finite(fit$theta)))
 })
 
-test_that("semi_aft_fg rejeita covariaveis nao binarias", {
+test_that("semi_aft_fg rejects non-binary covariates", {
   d <- gera_dados_fg()
   z_cont <- cbind(d$z, age = runif(nrow(d$z), 40, 80))
   
@@ -50,7 +50,7 @@ test_that("semi_aft_fg rejeita covariaveis nao binarias", {
   )
 })
 
-test_that("semi_aft_fg com bootstrap retorna variancias", {
+test_that("semi_aft_fg with bootstrap returns variances", {
   d <- gera_dados_fg(n = 30)
   
   fit <- semi_aft_fg(

@@ -1,4 +1,4 @@
-test_that("Componentes U2: kernel C++ equivale a referencia em R", {
+test_that("U2 components: C++ kernel equals the R reference", {
   set.seed(42)
   
   n <- 40
@@ -7,7 +7,7 @@ test_that("Componentes U2: kernel C++ equivale a referencia em R", {
   z  <- cbind(z1, z2)
   colnames(z) <- c("trt", "sex")
   
-  # Sobrevivencia com efeito do tratamento; censura aleatoria
+  # Survival with a treatment effect; random censoring
   t      <- rexp(n, rate = exp(0.3 * z1))
   status <- rbinom(n, 1, 0.8)
   qt     <- pmin(t, t * runif(n, 0.4, 1))
@@ -21,7 +21,7 @@ test_that("Componentes U2: kernel C++ equivale a referencia em R", {
   
   km_surv <- QAST:::prep_km_by_column(z, t, status)
   
-  # Grade de theta para comparacao ponto a ponto
+  # Grid of theta for the point-by-point comparison
   theta_grid <- rbind(
     c(0.0, 0.0),
     c(0.2, -0.1),
@@ -44,7 +44,7 @@ test_that("Componentes U2: kernel C++ equivale a referencia em R", {
         obj_cpp <- QAST:::U2_obj_fg_cpp(theta, lt, lq, z, status,
                                         beta, hL, km_surv, phi, norm_min)
         
-        # Replica a agregacao da norma na referencia
+        # Replicates the aggregation of the norm in the reference
         if (norm_min == "L1") {
           obj_ref <- sum(abs(parts_ref)) / sqrt(length(parts_ref))
         } else {

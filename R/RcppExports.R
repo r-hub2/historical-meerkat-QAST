@@ -61,6 +61,18 @@ eval_fg_obj_cpp <- function(pairs, lq, z, theta, phi, norm_min) {
     .Call(`_QAST_eval_fg_obj_cpp`, pairs, lq, z, theta, phi, norm_min)
 }
 
+make_fg_pw_lean_cpp <- function(lt, lq, z, status, beta, hL, km_surv) {
+    .Call(`_QAST_make_fg_pw_lean_cpp`, lt, lq, z, status, beta, hL, km_surv)
+}
+
+eval_fg_parts_pw_lean_cpp <- function(lean, lq, z, theta) {
+    .Call(`_QAST_eval_fg_parts_pw_lean_cpp`, lean, lq, z, theta)
+}
+
+eval_fg_obj_pw_lean_cpp <- function(lean, lq, z, theta, norm_min) {
+    .Call(`_QAST_eval_fg_obj_pw_lean_cpp`, lean, lq, z, theta, norm_min)
+}
+
 surv_qt_with_km_cpp <- function(qaly, time, status, km_time, km_surv, lin_pred = NULL) {
     .Call(`_QAST_surv_qt_with_km_cpp`, qaly, time, status, km_time, km_surv, lin_pred)
 }

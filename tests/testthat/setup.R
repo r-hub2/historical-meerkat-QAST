@@ -1,5 +1,5 @@
-# Variancias (jackknife/bootstrap) no processo principal durante os testes:
-# o covr so registra a cobertura do processo principal, e os refits rodam
-# nos filhos do fork quando ha mais de um worker. O caminho com fork segue
-# testado explicitamente em test-jackknife-se.R (cores = 2).
+# Variances (jackknife/bootstrap) in the main process during the tests:
+# covr only records the coverage of the main process, and the refits run
+# in the fork children when there is more than one worker. The fork path
+# is still tested explicitly in test-jackknife-se.R (cores = 2).
 options(QAST.cores = 1L)

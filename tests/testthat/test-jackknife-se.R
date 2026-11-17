@@ -1,5 +1,5 @@
-# .jackknife_se reproduz jackknifeR::jackknife(d = 1) — mesma
-# estatistica, mesma formula de SE, remocao de NA por bloco.
+# .jackknife_se reproduces jackknifeR::jackknife(d = 1) — same
+# statistic, same SE formula, NA removal per block.
 
 mk_jk_case <- function(n = 30, seed = 7) {
   set.seed(seed)
@@ -15,7 +15,7 @@ refit_case <- function(cas, keep) {
   dfoptim::nmk(c(0, 0), f)$par
 }
 
-test_that(".jackknife_se == jackknifeR::jackknife (sequencial e fork)", {
+test_that(".jackknife_se == jackknifeR::jackknife (sequential and fork)", {
   skip_if_not_installed("jackknifeR")
   cas <- mk_jk_case()
   dat <- data.frame(id = seq_len(cas$n), pad = 0)
@@ -33,8 +33,8 @@ test_that(".jackknife_se == jackknifeR::jackknife (sequencial e fork)", {
   expect_identical(se2, se1)
 })
 
-test_that(".jackknife_se: blocos independentes (NA removido por bloco)", {
-  # Bloco 'a' com NA na replica 3 nao afeta o bloco 'b'
+test_that(".jackknife_se: independent blocks (NA removed per block)", {
+  # Block 'a' with NA in replicate 3 does not affect block 'b'
   vals <- function(i) c(i^2, if (i == 3) NA else sqrt(i), i)
   se <- QAST:::.jackknife_se(6, vals, blocks = list(a = 1, b = 2:3),
                              cores = 1L)
@@ -45,7 +45,7 @@ test_that(".jackknife_se: blocos independentes (NA removido por bloco)", {
   expect_equal(se$b, jk_se(m[, 2:3, drop = FALSE]))
 })
 
-test_that(".jackknife_se: erro e warnings dos workers chegam a sessao", {
+test_that(".jackknife_se: errors and warnings of the workers reach the session", {
   expect_error(
     QAST:::.jackknife_se(4, function(i) if (i == 2) stop("falhou") else i,
                          blocks = list(a = 1), cores = 1L),

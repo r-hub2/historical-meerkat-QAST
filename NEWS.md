@@ -6,7 +6,16 @@ First release.
 
 * `semi_aft_fg()` fits the bivariate semiparametric AFT model of Fine and
   Gelber (2001) for survival and quality-adjusted survival, with binary
-  covariates and truncation at `L`.
+  covariates and truncation at `L`. As in the article, the estimating
+  function of `theta` sums over all pairs of subjects (the estimates do not
+  depend on the order of the rows) and weights each subject by the
+  Kaplan-Meier censoring survival of its censoring group. The new argument
+  `cens_group` sets the censoring partition; the default does not
+  stratify, as in the application of the article, and a warning flags
+  groups with no censoring survival left at `L`. This differs from the
+  code used in the thesis, which paired subjects by their position within
+  each covariate group and estimated the censoring separately for each
+  covariate.
 * `semi_aft_prop()` fits the bivariate semiparametric AFT model proposed in
   the doctoral thesis of da Silva (2026, Institute of Mathematics and
   Statistics, University of São Paulo), with IPCW weights from a Cox model
@@ -21,13 +30,18 @@ First release.
   survival probabilities given the covariates (`type = "survival"`), from
   the Kaplan-Meier curve of the survival time residuals and the Zhao and
   Tsiatis (1997) estimator of the quality-adjusted residuals; accepts
-  `newdata` for formula and matrix fits.
+  `newdata` for formula and matrix fits. With `se.fit = TRUE` (fits with
+  `var_comp = TRUE`), standard errors and pointwise confidence limits from
+  the jackknife or bootstrap replicates of the fit, with the intercept and
+  the residual distribution re-estimated in each replicate.
 * `qast_pp()`: P-P plots of the residuals by covariate group, the
   lack-of-fit diagnostic of Fine and Gelber (2001, Section 4), with the
   trimmed conditional quality-adjusted distribution for `semi_aft_fg()`
   fits; `print()` and `plot()` methods.
 * `surv_qt_fun()` implements the estimator of Zhao and Tsiatis (1997) for
-  the survival curve of the quality-adjusted time.
+  the survival curve of the quality-adjusted time, evaluated as
+  P(Q > q) at each subject (the convention of `predict()` and of the
+  Kaplan-Meier curve).
 
 ## Interface
 
@@ -53,6 +67,9 @@ First release.
 ## Computation
 
 * Estimating equations evaluated by C++ kernels (Rcpp/RcppArmadillo).
+* In `semi_aft_fg()` with `phi = "piecewise"`, the objective is evaluated
+  without storing the pairs: O(n) memory and O(n log^2 n) per evaluation,
+  with the same estimates.
 * In `semi_aft_fg()`, `theta` is obtained in closed form for
   `phi = "identity"` and `norm_min = "L2"` (`fast_path = TRUE`), and the
   pair marginals of the U-statistic are computed in O(N log^2 N).

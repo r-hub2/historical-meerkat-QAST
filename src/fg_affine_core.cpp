@@ -1,29 +1,29 @@
 // src/fg_affine_core.cpp
 //
-// Forma afim exata (phi = "identity") e avaliacao piecewise sobre vetores
-// achatados para a U-estatistica de Fine e Gelber, a partir do objeto de
-// pares de fg_pairs_core.cpp.
+// Exact affine form (phi = "identity") and piecewise evaluation over
+// flattened vectors for the U-statistic of Fine and Gelber, from the
+// pairs object of fg_pairs_core.cpp.
 //
-// SCHEMA DO OBJETO `pairs` (produzido por make_fg_pairs_cpp):
-//   pairs[[j]] (lista por coluna j de covariavel binaria):
-//     "ka"  - integer, indices globais (0-based) das linhas do grupo 0
-//     "kb"  - integer, indices globais das linhas do grupo 1
-//     "Ra"  - vec, marginal sum_b c_ab por membro do grupo 0 (alinhada a ka)
-//     "Cb"  - vec, marginal sum_a c_ab por membro do grupo 1 (alinhada a kb)
-//     "pa"  - integer, indice global do membro do grupo 0, por par valido
-//     "pb"  - integer, indice global do membro do grupo 1, por par valido
-//     "pc"  - vec, peso c_ab = h1L(a,b)/denom(a,b) por par valido
+// SCHEMA OF THE `pairs` OBJECT (produced by make_fg_pairs_cpp):
+//   pairs[[j]] (list per binary covariate column j):
+//     "ka"  - integer, global (0-based) indices of the rows of group 0
+//     "kb"  - integer, global indices of the rows of group 1
+//     "Ra"  - vec, marginal sum_b c_ab per member of group 0 (aligned with ka)
+//     "Cb"  - vec, marginal sum_a c_ab per member of group 1 (aligned with kb)
+//     "pa"  - integer, global index of the group 0 member, per valid pair
+//     "pb"  - integer, global index of the group 1 member, per valid pair
+//     "pc"  - vec, weight c_ab = h1L(a,b)/denom(a,b) per valid pair
 //   attr(pairs, "meta"): "p" (int), "n2" (double, n^2), "has_pairs",
 //     "cdq_cols"
 //
-// FIDELIDADE (verificada nos testes A/B contra fg_core.cpp):
-//   - identity: parts_j(theta) = alpha_j + W_j theta e a decomposicao
-//     algebrica exata de -(1/n^2)[ sum_a e2k(a) Ra_a - sum_b e2l(b) Cb_b ],
-//     e2 = lq - z theta; somas reordenadas (1e-10, nao bit-exata).
-//   - piecewise: mesma ordem de pares e mesma aritmetica do kernel de
-//     referencia; indicador 0 -> 0, > 0 -> 1, < 0 -> -1; divisao por n^2
-//     no fim.
-//   - colunas degeneradas (grupo vazio): Ra/Cb zerados, sem pares =>
+// FIDELITY (checked by the A/B tests against fg_core.cpp):
+//   - identity: parts_j(theta) = alpha_j + W_j theta is the exact
+//     algebraic decomposition of -(1/n^2)[ sum_a e2k(a) Ra_a - sum_b e2l(b) Cb_b ],
+//     e2 = lq - z theta; reordered sums (1e-10, not bit-exact).
+//   - piecewise: same pair order and arithmetic as the reference kernel;
+//     indicator 0 -> 0, > 0 -> 1, < 0 -> -1; division by n^2 at the
+//     end.
+//   - degenerate columns (empty group): Ra/Cb zeroed, no pairs =>
 //     parts(j) = 0.
 
 #include <RcppArmadillo.h>
@@ -35,9 +35,9 @@ using namespace arma;
 
 namespace fga {
 
-// attr("meta") devolve um proxy sem operator[]: materializa em List
+// attr("meta") returns a proxy without operator[]: materialize it as a List
 inline Rcpp::List get_meta(const Rcpp::List& obj) {
-  const Rcpp::List meta = obj.attr("meta");   // materializa em List
+  const Rcpp::List meta = obj.attr("meta");   // materialize as a List
   return meta;
 }
 
@@ -49,8 +49,8 @@ inline double meta_n2(const Rcpp::List& meta) {
   return Rcpp::as<double>(meta["n2"]);
 }
 
-// Acesso a campo de coluna com diagnostico claro se o nome divergir
-// do schema do fg_pairs_core.cpp (evita segfault silencioso).
+// Column field access with a clear diagnostic if the name diverges from
+// the schema of fg_pairs_core.cpp (avoids a silent segfault).
 inline Rcpp::List get_col(const Rcpp::List& pairs, int j) {
   if (j < 0 || j >= pairs.size())
     stop("fg_affine: invalid column index: %d", j);
@@ -58,7 +58,7 @@ inline Rcpp::List get_col(const Rcpp::List& pairs, int j) {
   return colj;
 }
 
-// Agregacao pela norma L1/L2, padronizada por sqrt(p)
+// Aggregation by the L1/L2 norm, standardized by sqrt(p)
 inline double norm_aggregate(const arma::vec& parts,
                              const std::string& norm_min) {
   const double q = std::sqrt(static_cast<double>(parts.n_elem));
@@ -68,7 +68,7 @@ inline double norm_aggregate(const arma::vec& parts,
   return std::sqrt(arma::accu(arma::square(parts))) / q;
 }
 
-// phi piecewise: sign(x) com 0 -> 0
+// piecewise phi: sign(x) with 0 -> 0
 inline double phi_pw(const double x) {
   if (x > 0.0) return 1.0;
   if (x < 0.0) return -1.0;
@@ -78,31 +78,31 @@ inline double phi_pw(const double x) {
 } // namespace fga
 
 // ===========================================================================
-// PARTE AFIM (phi = "identity")
+// AFFINE PART (phi = "identity")
 // ===========================================================================
 
 // make_fg_affine_cpp
 //
-// Extrai a forma afim exata das componentes da U-estatistica:
+// Extracts the exact affine form of the components of the U-statistic:
 //
-//   parts(theta) = alpha + W * theta,   alpha em R^p, W em R^{p x p}
+//   parts(theta) = alpha + W * theta,   alpha in R^p, W in R^{p x p}
 //
-// Derivacao (decomposicao algebrica exata da soma de pares):
+// Derivation (exact algebraic decomposition of the sum over pairs):
 //
 //   parts_j(theta) = -(1/n^2) [ sum_a e2k(a) Ra_a - sum_b e2l(b) Cb_b ]
-//     com e2k(a) = lq[ka] - zk(a) * theta,  e2l(b) = lq[kb] - zl(b) * theta
+//     with e2k(a) = lq[ka] - zk(a) * theta,  e2l(b) = lq[kb] - zl(b) * theta
 //
 //   => alpha_j = -(1/n^2) [ lqk' Ra - lql' Cb ]
 //   => W(j,:)  =  (1/n^2) [ Ra' zk - Cb' zl ]
 //
-// Avaliacao subsequente custa O(p^2), independente de n.
+// Each later evaluation costs O(p^2), independent of n.
 //
-// Argumentos:
-//   pairs - objeto de pares (schema no cabecalho do arquivo)
-//   lq    - h2$linkfun(qt), pre-computado (constante na otimizacao)
-//   z     - matriz de covariaveis binarias (n x p)
+// Arguments:
+//   pairs - pairs object (schema in the header of the file)
+//   lq    - h2$linkfun(qt), precomputed (constant in the optimization)
+//   z     - binary covariate matrix (n x p)
 //
-// Retorna List(alpha = vec p, W = mat p x p) com meta propagada.
+// Returns List(alpha = vec p, W = mat p x p) with the meta propagated.
 // [[Rcpp::export]]
 Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs,
                               const arma::vec& lq,
@@ -132,7 +132,7 @@ Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs,
     if (ka.n_elem != Ra.n_elem || kb.n_elem != Cb.n_elem)
       stop("make_fg_affine: column %d has misaligned ka/Ra or kb/Cb", j);
     
-    // Coluna degenerada (grupo vazio): alpha = W_j = 0
+    // Degenerate column (empty group): alpha = W_j = 0
     if (ka.n_elem == 0 && kb.n_elem == 0) continue;
     
     const arma::vec lqk = lq.elem(ka);
@@ -157,8 +157,8 @@ Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs,
 
 // eval_fg_parts_affine_cpp
 //
-// Componentes na forma afim: parts(theta) = alpha + W * theta.
-// O(p^2). Retorna vetor R sem atributo dim (conversao na fronteira).
+// Components in the affine form: parts(theta) = alpha + W * theta.
+// O(p^2). Returns an R vector without a dim attribute (converted at the boundary).
 // [[Rcpp::export]]
 Rcpp::NumericVector eval_fg_parts_affine_cpp(const Rcpp::List& aff,
                                              const arma::vec& theta) {
@@ -167,13 +167,13 @@ Rcpp::NumericVector eval_fg_parts_affine_cpp(const Rcpp::List& aff,
   
   const arma::vec parts = alpha + W * theta;
   
-  // NumericVector: um arma::vec exportado chegaria ao R como matriz p x 1
+  // NumericVector: an exported arma::vec would reach R as a p x 1 matrix
   return Rcpp::NumericVector(parts.begin(), parts.end());
 }
 
 // eval_fg_obj_affine_cpp
 //
-// Norma (L1/L2) das componentes afins, padronizada por sqrt(p).
+// Norm (L1/L2) of the affine components, standardized by sqrt(p).
 // [[Rcpp::export]]
 double eval_fg_obj_affine_cpp(const Rcpp::List& aff,
                               const arma::vec& theta,
@@ -188,24 +188,24 @@ double eval_fg_obj_affine_cpp(const Rcpp::List& aff,
 
 // solve_fg_theta_affine_cpp
 //
-// Caminho rapido (L2 + identity): minimiza ||alpha + W theta||^2 em
-// forma fechada via equacoes normais
+// Fast path (L2 + identity): minimizes ||alpha + W theta||^2 in closed
+// form by the normal equations
 //
 //     G theta = -g,   G = W'W,  g = W'alpha
 //
-// Posto deficiente (colunas degeneradas, identificabilidade parcial):
-// detectado por razao singular extremo < rcond OU residuo alto da
-// solucao direta; nesses casos usa-se a solucao de NORMA MINIMA via
-// pinv e full_rank = FALSE — a estimativa pontual segue valida, mas o
-// caller (semi_aft_fg) avisa o usuario.
+// Rank deficiency (degenerate columns, partial identifiability): detected
+// by an extreme singular value ratio < rcond OR a large residual of the
+// direct solution; in these cases the MINIMUM NORM solution via pinv is
+// used and full_rank = FALSE — the point estimate remains valid, but the
+// caller (semi_aft_fg) warns the user.
 //
-// O gradiente na solucao (2 W'(alpha + W theta)) e retornado como
-// verificacao: no posto completo deve ser ~0 (semi_aft_fg exige < 1e-6).
+// The gradient at the solution (2 W'(alpha + W theta)) is returned as a
+// check: at full rank it must be ~0 (semi_aft_fg requires < 1e-6).
 //
-// Retorna List:
-//   par        - coeficiente theta (vetor R SEM dim)
+// Returns List:
+//   par        - theta coefficient (R vector WITHOUT dim)
 //   full_rank  - logical
-//   grad_norm  - norma do gradiente do objetivo quadratico na solucao
+//   grad_norm  - norm of the gradient of the quadratic objective at the solution
 // [[Rcpp::export]]
 Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
                                      const double rcond = 1e-10) {
@@ -214,10 +214,10 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
   const arma::mat W     = Rcpp::as<arma::mat>(aff["W"]);
   const int p = static_cast<int>(alpha.n_elem);
   
-  const arma::mat G = W.t() * W;   // p x p, simetrica semidefinida positiva
+  const arma::mat G = W.t() * W;   // p x p, symmetric positive semidefinite
   const arma::vec g = W.t() * alpha;
   
-  // --- Deteccao de posto via razao singular extremos -------------
+  // --- Rank detection by the extreme singular value ratio ----------
   bool full_rank = false;
   if (p > 0) {
     arma::mat U, V;
@@ -229,14 +229,14 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
     }
   }
   
-  // --- Solucao direta (posto completo) -----------------------------
+  // --- Direct solution (full rank) ---------------------------------
   arma::vec theta;
   bool solved = false;
   if (full_rank) {
     const arma::vec cand = arma::solve(G, -g,
                                        arma::solve_opts::likely_sympd);
     if (cand.n_elem == static_cast<arma::uword>(p) && cand.is_finite()) {
-      // Verificacao por residuo: resolve mesmo com condicionamento ruim
+      // Residual check: solves even with poor conditioning
       const double res  = arma::norm(G * cand + g, 2);
       const double gsc  = arma::norm(g, 2);
       const double tol  = 1e-8 * (1.0 + gsc);
@@ -247,7 +247,7 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
     }
   }
   
-  // --- Fallback: norma minima (posto deficiente) ---------------------
+  // --- Fallback: minimum norm (rank deficient) ----------------------
   if (!solved) {
     if (p > 0) {
       theta = -(arma::pinv(G, rcond) * g);
@@ -258,12 +258,12 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
   }
   
   if (!theta.is_finite()) {
-    // Caso patologico (G == 0, alpha != 0): theta = 0 e aviso via grad
+    // Pathological case (G == 0, alpha != 0): theta = 0 and a warning via grad
     theta.zeros(p);
     full_rank = false;
   }
   
-  // Gradiente do objetivo ||alpha + W theta||^2 na solucao: 2 W' parts
+  // Gradient of the objective ||alpha + W theta||^2 at the solution: 2 W' parts
   const arma::vec parts    = alpha + W * theta;
   const double   grad_norm = (p > 0) ? arma::norm(W.t() * parts, 2) : 0.0;
   
@@ -276,20 +276,20 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
 }
 
 // ===========================================================================
-// PARTE PIECEWISE SOBRE VETORES ACHATADOS
+// PIECEWISE PART OVER FLATTENED VECTORS
 // ===========================================================================
 
 // compile_fg_pw_cpp
 //
-// Achata o objeto de pares em vetores globais para avaliacao piecewise
-// O(nnz) sequencial (os filtros de eventos/pesos/h1L ja foram
-// resolvidos na construcao dos pares).
+// Flattens the pairs object into global vectors for the sequential
+// O(nnz) piecewise evaluation (the event/weight/h1L filters were already
+// resolved when the pairs were built).
 //
-// Layout de saida (CSR por coluna):
-//   pa, pb  - integer: linhas globais dos membros do grupo 0/1 de cada par
-//   pc      - vec: peso c_ab de cada par
-//   col_ptr - integer (p+1): fronteiras de coluna (col_ptr[j] .. col_ptr[j+1])
-//   meta    - propagada
+// Output layout (CSR per column):
+//   pa, pb  - integer: global rows of the group 0/1 members of each pair
+//   pc      - vec: weight c_ab of each pair
+//   col_ptr - integer (p+1): column boundaries (col_ptr[j] .. col_ptr[j+1])
+//   meta    - propagated
 // [[Rcpp::export]]
 Rcpp::List compile_fg_pw_cpp(const Rcpp::List& pairs) {
   
@@ -298,15 +298,15 @@ Rcpp::List compile_fg_pw_cpp(const Rcpp::List& pairs) {
   const double n2 = fga::meta_n2(meta);
   const double n  = std::sqrt(n2);
 
-  // Objeto construido com phi = "identity" nao guarda pares: erro
-  // explicito em vez de componentes nulas.
+  // An object built with phi = "identity" stores no pairs: an explicit
+  // error instead of null components.
   if (meta.containsElementNamed("has_pairs") &&
       !Rcpp::as<bool>(meta["has_pairs"]))
     stop("compile_fg_pw: an object built with phi = 'identity' has no "
            "pairs; rebuild it with make_fg_pairs(..., 'piecewise')");
 
-  // Indices como integer, lidos por ponteiro em pw_parts; a faixa [0, n)
-  // e validada aqui, uma vez, e nao a cada avaliacao.
+  // Indices as integer, read by pointer in pw_parts; the range [0, n)
+  // is validated here, once, and not at each evaluation.
   std::vector<int>    pa_v, pb_v;
   std::vector<double> pc_v;
   std::vector<int>    col_ptr_v;
@@ -316,7 +316,7 @@ Rcpp::List compile_fg_pw_cpp(const Rcpp::List& pairs) {
   for (int j = 0; j < p; ++j) {
     const Rcpp::List colj = fga::get_col(pairs, j);
 
-    // A coercao para integer aceita tambem indices double
+    // The coercion to integer also accepts double indices
     const Rcpp::IntegerVector paj = colj["pa"];
     const Rcpp::IntegerVector pbj = colj["pb"];
     const Rcpp::NumericVector pcj = colj["pc"];
@@ -349,7 +349,7 @@ Rcpp::List compile_fg_pw_cpp(const Rcpp::List& pairs) {
   return out;
 }
 
-// Nucleo compartilhado: componentes piecewise como arma::vec
+// Shared core: piecewise components as arma::vec
 namespace fga {
 
 arma::vec pw_parts(const Rcpp::List& pw,
@@ -361,8 +361,8 @@ arma::vec pw_parts(const Rcpp::List& pw,
   const int    p  = fga::meta_p(meta);
   const double n2 = fga::meta_n2(meta);
   
-  // Visoes sem copia sobre os vetores do R (IntegerVector/NumericVector
-  // sobre SEXP do tipo certo nao alocam)
+  // Copy-free views over the R vectors (IntegerVector/NumericVector over
+  // a SEXP of the right type do not allocate)
   const Rcpp::IntegerVector pa      = pw["pa"];
   const Rcpp::IntegerVector pb      = pw["pb"];
   const Rcpp::NumericVector pc      = pw["pc"];
@@ -379,7 +379,7 @@ arma::vec pw_parts(const Rcpp::List& pw,
       static_cast<int>(z.n_cols) != p)
     stop("eval_fg_parts_pw: incompatible lq/z/theta dimensions");
 
-  // Residuos e2 = lq - z*theta para TODAS as linhas, uma vez: O(n p)
+  // Residuals e2 = lq - z*theta for ALL rows, once: O(n p)
   const arma::vec e2 = lq - z * theta;
   const double* e2p = e2.memptr();
   const int*    pap = pa.begin();
@@ -388,8 +388,8 @@ arma::vec pw_parts(const Rcpp::List& pw,
 
   arma::vec parts(p, arma::fill::zeros);
 
-  // Varredura sequencial pura: cada par valido contribui
-  //   -c_ab * phi(e2[pa] - e2[pb]),  phi piecewise com 0 -> 0
+  // Pure sequential sweep: each valid pair contributes
+  //   -c_ab * phi(e2[pa] - e2[pb]),  piecewise phi with 0 -> 0
   for (int j = 0; j < p; ++j) {
     const int lo = col_ptr[j];
     const int hi = col_ptr[j + 1];
@@ -406,7 +406,7 @@ arma::vec pw_parts(const Rcpp::List& pw,
 
 // eval_fg_parts_pw_cpp
 //
-// Componentes piecewise. Retorna vetor R sem dim.
+// Piecewise components. Returns an R vector without dim.
 // [[Rcpp::export]]
 Rcpp::NumericVector eval_fg_parts_pw_cpp(const Rcpp::List& pw,
                                          const arma::vec& lq,
@@ -418,7 +418,7 @@ Rcpp::NumericVector eval_fg_parts_pw_cpp(const Rcpp::List& pw,
 
 // eval_fg_obj_pw_cpp
 //
-// Norma (L1/L2) das componentes piecewise, padronizada por sqrt(p).
+// Norm (L1/L2) of the piecewise components, standardized by sqrt(p).
 // [[Rcpp::export]]
 double eval_fg_obj_pw_cpp(const Rcpp::List& pw,
                           const arma::vec& lq,

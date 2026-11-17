@@ -1,20 +1,20 @@
 # tests/testthat/test-fg-equivalence-extended.R
 #
-# Equivalencia numerica do kernel FG (U2_parts_fg_cpp) com a referencia
-# em R. Estende test-fg-equivalence.R (grade de theta x phi x norm) com:
+# Numerical equivalence of the FG kernel (U2_parts_fg_cpp) with the R
+# reference. Extends test-fg-equivalence.R (grid of theta x phi x norm) with:
 #
-#   1. grade de beta   - os pares pre-computados dependem de beta
-#   2. grupo vazio / coluna constante / grupo sem eventos (path rep(1, n))
-#   3. censura pesada com sobrevivencia KM chegando a zero (filtro denom)
-#   4. empate exato na fronteira do indicador h1L (desigualdade estrita)
-#   5. L menor (quantil 0.5) para exercitar a truncagem em mais pares
-#   6. fumaca: n = 200, p = 1
+#   1. grid of beta   - the precomputed pairs depend on beta
+#   2. empty group / constant column / group without events (path rep(1, n))
+#   3. heavy censoring with the KM survival reaching zero (denom filter)
+#   4. exact tie at the boundary of the h1L indicator (strict inequality)
+#   5. smaller L (quantile 0.5) to exercise the truncation on more pairs
+#   6. smoke: n = 200, p = 1
 #
-# Todos os blocos comparam U2_parts_fg_cpp contra U2_parts_fg_ref
-# (referencia R puro) e a agregacao da norma, tolerancia 1e-10.
+# All blocks compare U2_parts_fg_cpp against U2_parts_fg_ref (pure R
+# reference) and the aggregation of the norm, tolerance 1e-10.
 
 # --------------------------------------------------------------------------
-# Helper: comparacao completa (parts + obj agregado) para um ponto
+# Helper: full comparison (parts + aggregated obj) for one point
 # --------------------------------------------------------------------------
 expect_fg_equivalent <- function(theta, lt, lq, z, status, beta, hL,
                                  km_surv, phi, norm_min, tol = 1e-10) {
@@ -34,7 +34,7 @@ expect_fg_equivalent <- function(theta, lt, lq, z, status, beta, hL,
   expect_equal(obj_cpp, obj_ref, tolerance = tol)
 }
 
-# Percorre as grades de phi/norm/theta para uma configuracao fixa
+# Goes through the grids of phi/norm/theta for a fixed configuration
 compare_over_grids <- function(lt, lq, z, status, beta, hL, km_surv,
                                theta_grid) {
   for (phi in c("identity", "piecewise")) {
@@ -48,9 +48,9 @@ compare_over_grids <- function(lt, lq, z, status, beta, hL, km_surv,
 }
 
 # --------------------------------------------------------------------------
-# 1. Grade de beta x theta (caso base: aleatorio "limpo", L no q90)
+# 1. Grid of beta x theta (base case: "clean" random data, L at q90)
 # --------------------------------------------------------------------------
-test_that("FG: kernel C++ equivale a referencia em grade de beta e theta", {
+test_that("FG: C++ kernel equals the reference on a grid of beta and theta", {
   set.seed(42)
   
   n <- 40
@@ -64,12 +64,12 @@ test_that("FG: kernel C++ equivale a referencia em grade de beta e theta", {
   lt <- log(t); lq <- log(qt)
   km_surv <- QAST:::prep_km_by_column(z, t, status)
   
-  # beta = 0 verifica o caso degenerado z'beta = 0 no indicador h1L
+  # beta = 0 checks the degenerate case z'beta = 0 in the h1L indicator
   beta_grid <- rbind(
     c(0.0,  0.0),
     c(0.3, -0.2),
-    c(0.8,  0.5),   # efeitos fortes: empurra mais pares para fora de L
-    c(-0.5, 0.7)    # sinais mistos
+    c(0.8,  0.5),   # strong effects: push more pairs outside L
+    c(-0.5, 0.7)    # mixed signs
   )
   
   theta_grid <- rbind(
@@ -82,33 +82,33 @@ test_that("FG: kernel C++ equivale a referencia em grade de beta e theta", {
   for (b in seq_len(nrow(beta_grid))) {
     beta <- beta_grid[b, ]
     
-    # L no quantil 0.9 (padrao do teste original)
+    # L at the 0.9 quantile (default of the original test)
     hL <- log(stats::quantile(t, 0.9))
     compare_over_grids(lt, lq, z, status, beta, hL, km_surv, theta_grid)
     
-    # L menor: truncagem corta muitos mais pares
+    # Smaller L: the truncation cuts many more pairs
     hL_mid <- log(stats::quantile(t, 0.5))
     compare_over_grids(lt, lq, z, status, beta, hL_mid, km_surv, theta_grid)
   }
 })
 
 # --------------------------------------------------------------------------
-# 2. Coluna constante / grupo vazio / grupo sem eventos
-#    Coberturas: parts(j) = 0 (nk = 0 ou nl = 0) e o caminho rep(1, n)
-#    de km_weights_at (grupo com status == 0 para todos).
+# 2. Constant column / empty group / group without events
+#    Covers: parts(j) = 0 (nk = 0 or nl = 0) and the rep(1, n) path
+#    of km_weights_at (group with status == 0 for all).
 # --------------------------------------------------------------------------
-test_that("FG: coluna constante, grupo vazio e grupo sem eventos", {
+test_that("FG: constant column, empty group and group without events", {
   set.seed(7)
   
   n <- 60
   z <- cbind(rbinom(n, 1, 0.5),   # normal
-             rep(0, n),           # constante 0  -> grupo 1 vazio
-             rep(1, n))           # constante 1  -> grupo 0 vazio
+             rep(0, n),           # constant 0  -> group 1 empty
+             rep(1, n))           # constant 1  -> group 0 empty
   colnames(z) <- c("trt", "cte0", "cte1")
   
   t <- rexp(n)
-  # Grupo sem eventos: todos os sujeitos com trt = 1 sao censurados.
-  # (exerce o caminho rep(1, n) de km_weights_at dentro de prep_km_by_column)
+  # Group without events: all subjects with trt = 1 are censored.
+  # (exercises the rep(1, n) path of km_weights_at inside prep_km_by_column)
   status <- ifelse(z[, 1] == 1, 0L, rbinom(n, 1, 0.8))
   
   qt <- pmin(t, t * runif(n, 0.4, 1))
@@ -127,7 +127,7 @@ test_that("FG: coluna constante, grupo vazio e grupo sem eventos", {
     }
   }
   
-  # As colunas constantes devem ter componente identicamente nula
+  # The constant columns must have an identically null component
   parts <- QAST:::U2_parts_fg_cpp(theta, lt, lq, z, status,
                                   beta, hL, km_surv, "identity")
   expect_identical(unname(parts[2]), 0.0)
@@ -135,10 +135,10 @@ test_that("FG: coluna constante, grupo vazio e grupo sem eventos", {
 })
 
 # --------------------------------------------------------------------------
-# 3. Censura pesada: sobrevivencia KM chega perto de / atinge zero
-#    (exerce o filtro !(denom > 0) || !isfinite(denom))
+# 3. Heavy censoring: the KM survival gets close to / reaches zero
+#    (exercises the filter !(denom > 0) || !isfinite(denom))
 # --------------------------------------------------------------------------
-test_that("FG: censura pesada com pesos KM quase nulos", {
+test_that("FG: heavy censoring with near-zero KM weights", {
   set.seed(123)
   
   n <- 120
@@ -147,8 +147,8 @@ test_that("FG: censura pesada com pesos KM quase nulos", {
   
   t <- rexp(n, rate = exp(0.3 * z[, 1]))
   
-  # 70% de censura + 1 sujeito censurado num tempo posterior ao ultimo
-  # evento: garante cauda com S(t) muito baixa
+  # 70% censoring + 1 subject censored after the last event: ensures a
+  # tail with a very low S(t)
   status <- rbinom(n, 1, 0.30)
   status[n] <- 0L
   t[n] <- max(t) * 10
@@ -158,7 +158,7 @@ test_that("FG: censura pesada com pesos KM quase nulos", {
   
   km_surv <- QAST:::prep_km_by_column(z, t, status)
   
-  # Sanity: pesos KH do ultimo sujeito devem ser validos (nao NaN/Inf)
+  # Sanity: the KM weights of the last subject must be valid (not NaN/Inf)
   w0 <- km_surv[[1]]$w0
   expect_true(all(is.finite(w0)))
   
@@ -168,20 +168,20 @@ test_that("FG: censura pesada com pesos KM quase nulos", {
 })
 
 # --------------------------------------------------------------------------
-# 4. Empate EXATO na fronteira do indicador h1L
+# 4. EXACT tie at the boundary of the h1L indicator
 #
-#   O indicador usa desigualdade ESTRITA:
-#     h1L = 1 se  hL - max(z'beta) > max(e1k, e1l)   senao 0
+#   The indicator uses a STRICT inequality:
+#     h1L = 1 if  hL - max(z'beta) > max(e1k, e1l)   else 0
 #
-#   Construimos empates exatos com beta = 0 (z'beta identicamente 0) e
-#   tempos DUPLICADOS iguais a L: para todo par cujos dois membros tenham
-#   t == L, max(e1k, e1l) == hL bit a bit (mesma chamada a log()), e a
-#   comparacao estrita deve dar 0. Pares com max(e1) logo abaixo devem
-#   dar 1. E o caso mais sensivel a reordenacao de ponto flutuante: os
-#   empates exatos construidos aqui devem permanecer identicos a
-#   referencia.
+#   Exact ties are built with beta = 0 (z'beta identically 0) and
+#   DUPLICATED times equal to L: for every pair whose two members have
+#   t == L, max(e1k, e1l) == hL bit for bit (same call to log()), and
+#   the strict comparison must give 0. Pairs with max(e1) just below
+#   must give 1. It is the case most sensitive to floating-point
+#   reordering: the exact ties built here must stay identical to the
+#   reference.
 # --------------------------------------------------------------------------
-test_that("FG: empate exato na fronteira de h1L (desigualdade estrita)", {
+test_that("FG: exact tie at the h1L boundary (strict inequality)", {
   set.seed(99)
   
   n <- 50
@@ -191,17 +191,17 @@ test_that("FG: empate exato na fronteira de h1L (desigualdade estrita)", {
   t <- rexp(n)
   status <- rbinom(n, 1, 0.8)
   
-  # Duplica tempos no valor de L: 4 sujeitos com t exatamente igual a L
+  # Duplicates times at the value of L: 4 subjects with t exactly equal to L
   L  <- stats::quantile(t, 0.7, names = FALSE)
   idx_dup <- c(1, 2, 3, 4)
   t[idx_dup] <- L
   
-  # beta = 0 => z'beta == 0 exatamente; o indicador vira log(L) > max(e1)
+  # beta = 0 => z'beta == 0 exactly; the indicator becomes log(L) > max(e1)
   beta <- c(0.0, 0.0)
   
   qt <- pmin(t, t * runif(n, 0.4, 1))
   lt <- log(t); lq <- log(qt)
-  hL <- log(L)  # mesma operacao log() aplicada ao mesmo double => bit a bit igual a lt dos duplicados
+  hL <- log(L)  # same log() on the same double => bit for bit equal to the lt of the duplicates
   
   km_surv <- QAST:::prep_km_by_column(z, t, status)
   
@@ -218,9 +218,9 @@ test_that("FG: empate exato na fronteira de h1L (desigualdade estrita)", {
 })
 
 # --------------------------------------------------------------------------
-# 6. Fumaca: p = 1, n = 200
+# 6. Smoke: p = 1, n = 200
 # --------------------------------------------------------------------------
-test_that("FG: fumaca p = 1, n = 200", {
+test_that("FG: smoke p = 1, n = 200", {
   set.seed(2024)
   
   n <- 200

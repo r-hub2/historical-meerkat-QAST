@@ -1,9 +1,9 @@
 # R/qast_pp.R
 #
-# Diagnostico de falta de ajuste por P-P plots dos residuos (Fine e Gelber,
-# 2001, Secao 4): sob o modelo, a distribuicao dos residuos nao depende das
-# covariaveis, entao as distribuicoes estimadas em dois grupos de
-# covariaveis devem formar uma reta de (0, 0) a (1, 1).
+# Lack-of-fit diagnostic by P-P plots of the residuals (Fine and Gelber,
+# 2001, Section 4): under the model, the distribution of the residuals
+# does not depend on the covariates, so the distributions estimated in two
+# covariate groups must form a line from (0, 0) to (1, 1).
 
 #' P-P plots of the residuals by covariate group
 #'
@@ -26,21 +26,24 @@
 #'     among the events of the group, normalized by the total weight of
 #'     the group:
 #'     \deqn{\hat F_s(t) = \frac{\sum_j \Delta_j \hat H(X_j)^{-1}
-#'       I\{A_j, Z_j \in S_s, \hat\epsilon_{2j} \le t\}}{\sum_j \Delta_j
+#'       I\{A_j, Z_j \in S_s, \hat\epsilon_{2j} < t\}}{\sum_j \Delta_j
 #'       \hat H(X_j)^{-1} I\{A_j, Z_j \in S_s\}}.}{F_s(t) = sum_j
-#'       Delta_j / H(X_j) I(A_j, j in group s, e2_j <= t) / sum_j
+#'       Delta_j / H(X_j) I(A_j, j in group s, e2_j < t) / sum_j
 #'       Delta_j / H(X_j) I(A_j, j in group s).}
 #'     For \code{semi_aft_fg()} fits, as in Fine and Gelber (2001),
 #'     \eqn{A_j}{A_j} is the trimming
 #'     \eqn{\hat\epsilon_{1j} < h_1(L) - \max_k \hat\beta^\top Z_k}{e1_j <
 #'     h1(L) - max_k beta'Z_k}, so \eqn{\hat F_s}{F_s} estimates the
 #'     conditional distribution
-#'     \eqn{\Pr\{\epsilon_2 \le t \mid \epsilon_1 < h_1(L) -
-#'     \max_Z(\beta^\top Z)\}}{Pr(e2 <= t | e1 < h1(L) - max beta'Z)}
+#'     \eqn{\Pr\{\epsilon_2 < t \mid \epsilon_1 < h_1(L) -
+#'     \max_Z(\beta^\top Z)\}}{Pr(e2 < t | e1 < h1(L) - max beta'Z)}
 #'     required by the estimating function of \eqn{\theta}{theta}, and
-#'     \eqn{\hat H}{H} is the Kaplan-Meier censoring survival within the
-#'     group. For \code{semi_aft_prop()} fits, which have no truncation
-#'     time, there is no trimming (\eqn{A_j}{A_j} always holds) and
+#'     \eqn{\hat H = \hat H_{G_j}(X_j)}{H = H_G(X_j)} is the Kaplan-Meier
+#'     censoring survival in the censoring group of the fit
+#'     (\code{cens_group} of \code{\link{semi_aft_fg}}; the marginal
+#'     Kaplan-Meier without stratification, the default). For
+#'     \code{semi_aft_prop()} fits, which have no truncation time, there
+#'     is no trimming (\eqn{A_j}{A_j} always holds) and
 #'     \eqn{\hat H}{H} are the censoring weights of the fit: the Cox model
 #'     of the censoring given the covariates when \code{cens_weight = TRUE},
 #'     the Kaplan-Meier within the group otherwise.
@@ -50,7 +53,10 @@
 #' Each group is compared with the reference group \code{ref} on a common
 #' grid of residual values (the event residuals of the two groups; for
 #' \code{beta}, up to the smallest of the two largest residuals, beyond
-#' which a Kaplan-Meier curve is undefined). Continuous covariates must be
+#' which a Kaplan-Meier curve is undefined). As in the article, the
+#' quality-adjusted distribution uses the strict indicator
+#' \eqn{\hat\epsilon_{2j} < t}{e2_j < t}, so at each grid value it is the
+#' left limit; the last point of the grid closes the curve at (1, 1). Continuous covariates must be
 #' discretized to form the groups (e.g. with \code{cut()}).
 #'
 #' @param fit Object of class \code{"qast_fit"}
@@ -114,7 +120,7 @@ qast_pp <- function(fit, group, ref = NULL) {
   e1 <- h1$linkfun(t) - drop(z %*% fit$beta)
   e2 <- h2$linkfun(qt) - drop(z %*% fit$theta)
 
-  # Truncamento de Fine e Gelber: e1 < h1(L) - max_k beta'Z_k
+  # Fine and Gelber trimming: e1 < h1(L) - max_k beta'Z_k
   trim <- NULL
   keep <- rep(TRUE, n)
   if (fit$model == "fg") {
@@ -122,10 +128,13 @@ qast_pp <- function(fit, group, ref = NULL) {
     keep <- e1 < trim
   }
 
-  # Sobrevivencia da censura em X_j
+  # Censoring survival at X_j
   H <- numeric(n)
   if (fit$model == "prop" && isTRUE(fit$settings$cens_weight)) {
     H <- HG(X = z, t = t, status = status)
+  } else if (fit$model == "fg" && !is.null(fit$settings$cens_group)) {
+    # H_{G_j}(X_j) from the censoring partition of the fit, as in the article
+    H <- km_weights_by_group(t, status, fit$settings$cens_group)
   } else {
     for (l in lev) {
       i <- g == l
@@ -145,7 +154,7 @@ qast_pp <- function(fit, group, ref = NULL) {
                    else ""), call. = FALSE)
   }
 
-  # Distribuicoes por grupo (funcoes de distribuicao, continuas a direita)
+  # Distributions per group (distribution functions)
   cdf1 <- lapply(stats::setNames(lev, lev), function(l) {
     i <- g == l
     d <- .resid_dist_km(e1[i], status[i])
@@ -156,8 +165,9 @@ qast_pp <- function(fit, group, ref = NULL) {
     i <- g == l & w > 0
     v <- e2[i]; wi <- w[i] / sum(w[i])
     o <- order(v); v <- v[o]; cw <- cumsum(wi[o])
+    # Pr(e2 < t), with the strict indicator of the article: sum of v < x
     list(fun = function(x) {
-      k <- findInterval(x, v)
+      k <- findInterval(x, v, left.open = TRUE)
       c(0, cw)[k + 1L]
     }, jumps = sort(unique(v)))
   })
@@ -170,9 +180,10 @@ qast_pp <- function(fit, group, ref = NULL) {
                group = c(0, cdf1[[l]]$fun(tt)))
   })
   pp2 <- lapply(stats::setNames(others, others), function(l) {
-    tt <- sort(unique(c(cdf2[[ref]]$jumps, cdf2[[l]]$jumps)))
-    data.frame(t = c(-Inf, tt), ref = c(0, cdf2[[ref]]$fun(tt)),
-               group = c(0, cdf2[[l]]$fun(tt)))
+    # With <, the value at a jump is the left limit; Inf closes at (1, 1)
+    tt <- c(sort(unique(c(cdf2[[ref]]$jumps, cdf2[[l]]$jumps))), Inf)
+    data.frame(t = tt, ref = cdf2[[ref]]$fun(tt),
+               group = cdf2[[l]]$fun(tt))
   })
 
   out <- list(beta = pp1, theta = pp2, levels = lev, ref = ref,

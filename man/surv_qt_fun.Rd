@@ -34,10 +34,14 @@ inverse of the censoring survival at its survival time, which corrects
 the induced informative censoring on the quality-adjusted scale:
 }
 \details{
-\code{pred_surv[i] = (1/n) * sum_\{j : qalys[j] >= qalys[i]\} status[j] / G(t_j)}
+\code{pred_surv[i] = (1/n) * sum_\{j : qalys[j] > qalys[i]\} status[j] / G(t_j)}
 
 where G is the Kaplan-Meier survival of the censoring distribution and
 \code{qalys = log(qaly) - lin_pred} when a linear predictor is given.
+\code{pred_surv[i]} is the survival \eqn{P(Q > q_i)}{P(Q > q_i)} at the
+quality-adjusted time of each subject (right-continuous steps, the same
+convention as \code{predict(type = "survival")} and the Kaplan-Meier
+curve).
 }
 \examples{
 set.seed(1)

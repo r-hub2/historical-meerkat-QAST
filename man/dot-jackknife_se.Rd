@@ -17,14 +17,15 @@ refit (e.g. \code{list(beta = 1:p, theta = p + 1:p)})}
 
 \item{cores}{Number of workers (fork)}
 
-\item{cov}{If TRUE, returns \code{list(se, cov)} per block, with the
-jackknife covariance matrix
+\item{cov}{If TRUE, returns \code{list(se, cov, reps, drop)} per block,
+with the jackknife covariance matrix
 \code{(n - 1) / n_valid * crossprod(jk - theta_dot)} (whose diagonal is
-\code{se^2})}
+\code{se^2}), the valid replicates (rows of \code{reps}) and the
+observation removed in each of them (\code{drop})}
 }
 \value{
 Named list (as blocks) of standard-error vectors, or of
-  \code{list(se, cov)} when \code{cov = TRUE}
+  \code{list(se, cov, reps, drop)} when \code{cov = TRUE}
 }
 \description{
 Delete-1 jackknife standard errors, by parameter block

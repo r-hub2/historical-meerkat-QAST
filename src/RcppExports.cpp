@@ -233,6 +233,52 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// make_fg_pw_lean_cpp
+Rcpp::List make_fg_pw_lean_cpp(const arma::vec& lt, const arma::vec& lq, const arma::mat& z, const arma::vec& status, const arma::vec& beta, const double hL, const Rcpp::List& km_surv);
+RcppExport SEXP _QAST_make_fg_pw_lean_cpp(SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type status(statusSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const double >::type hL(hLSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type km_surv(km_survSEXP);
+    rcpp_result_gen = Rcpp::wrap(make_fg_pw_lean_cpp(lt, lq, z, status, beta, hL, km_surv));
+    return rcpp_result_gen;
+END_RCPP
+}
+// eval_fg_parts_pw_lean_cpp
+Rcpp::NumericVector eval_fg_parts_pw_lean_cpp(const Rcpp::List& lean, const arma::vec& lq, const arma::mat& z, const arma::vec& theta);
+RcppExport SEXP _QAST_eval_fg_parts_pw_lean_cpp(SEXP leanSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type lean(leanSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
+    rcpp_result_gen = Rcpp::wrap(eval_fg_parts_pw_lean_cpp(lean, lq, z, theta));
+    return rcpp_result_gen;
+END_RCPP
+}
+// eval_fg_obj_pw_lean_cpp
+double eval_fg_obj_pw_lean_cpp(const Rcpp::List& lean, const arma::vec& lq, const arma::mat& z, const arma::vec& theta, const std::string& norm_min);
+RcppExport SEXP _QAST_eval_fg_obj_pw_lean_cpp(SEXP leanSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP, SEXP norm_minSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type lean(leanSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type norm_min(norm_minSEXP);
+    rcpp_result_gen = Rcpp::wrap(eval_fg_obj_pw_lean_cpp(lean, lq, z, theta, norm_min));
+    return rcpp_result_gen;
+END_RCPP
+}
 // surv_qt_with_km_cpp
 NumericVector surv_qt_with_km_cpp(const NumericVector& qaly, const NumericVector& time, const NumericVector& status, const NumericVector& km_time, const NumericVector& km_surv, const Nullable<NumericVector>& lin_pred);
 RcppExport SEXP _QAST_surv_qt_with_km_cpp(SEXP qalySEXP, SEXP timeSEXP, SEXP statusSEXP, SEXP km_timeSEXP, SEXP km_survSEXP, SEXP lin_predSEXP) {
@@ -266,6 +312,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_QAST_make_fg_pairs_cpp", (DL_FUNC) &_QAST_make_fg_pairs_cpp, 9},
     {"_QAST_eval_fg_parts_cpp", (DL_FUNC) &_QAST_eval_fg_parts_cpp, 5},
     {"_QAST_eval_fg_obj_cpp", (DL_FUNC) &_QAST_eval_fg_obj_cpp, 6},
+    {"_QAST_make_fg_pw_lean_cpp", (DL_FUNC) &_QAST_make_fg_pw_lean_cpp, 7},
+    {"_QAST_eval_fg_parts_pw_lean_cpp", (DL_FUNC) &_QAST_eval_fg_parts_pw_lean_cpp, 4},
+    {"_QAST_eval_fg_obj_pw_lean_cpp", (DL_FUNC) &_QAST_eval_fg_obj_pw_lean_cpp, 5},
     {"_QAST_surv_qt_with_km_cpp", (DL_FUNC) &_QAST_surv_qt_with_km_cpp, 6},
     {NULL, NULL, 0}
 };

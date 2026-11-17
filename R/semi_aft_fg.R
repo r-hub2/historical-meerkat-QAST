@@ -2,9 +2,10 @@
 #'
 #' Fits the bivariate semiparametric accelerated failure time model of Fine
 #' and Gelber (2001) for the joint analysis of survival time and
-#' quality-adjusted survival time. The model works on pairs of subjects
-#' between the groups defined by each binary covariate, with Kaplan-Meier
-#' censoring weights per group and truncation at \code{L}.
+#' quality-adjusted survival time. The estimating function of the
+#' quality-adjusted coefficients is a U-statistic over all pairs of
+#' subjects, truncated at \code{L} and weighted by the inverse of the
+#' Kaplan-Meier censoring survival in the censoring group of each subject.
 #'
 #' @param t Observed survival times, or a formula
 #'   \code{Qsurv(t, qt, status) ~ covariates} (see \code{\link{Qsurv}}); with
@@ -44,6 +45,19 @@
 #'   \code{method}
 #' @param data Data frame with the formula variables, when \code{t} is a
 #'   formula
+#' @param cens_group Censoring partition. The model assumes that the
+#'   censoring depends on the covariates only through a discrete grouping
+#'   G chosen by the analyst, and weights each subject by the Kaplan-Meier
+#'   censoring survival of its group, \eqn{\hat H_G(X)}{H_G(X)}.
+#'   \code{NULL} (default) does not stratify, as in the application of
+#'   Fine and Gelber (2001). Otherwise, a vector with one value per
+#'   observation defining the groups, e.g. a covariate associated with the
+#'   censoring, or a discretized one (Fine and Gelber stratified by age
+#'   dichotomized at the median as a sensitivity analysis). To choose it,
+#'   one can check the effect of the covariates on the censoring, as in the
+#'   article, e.g. with \code{survival::coxph(Surv(t, 1 - status) ~ z)}.
+#'   \code{L} must satisfy \eqn{\hat H_G(L) > 0}{H_G(L) > 0} in every
+#'   group (a warning flags the groups where it does not)
 #'
 #' @return Object of class \code{"qast_fit"} (see \code{\link{qast_fit}}),
 #'   with \code{beta}, \code{theta}, \code{intercept} and, if
@@ -83,14 +97,14 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
                         method = "Nelder-Mead", norm_min = "L2",
                         L, phi = "identity", M = NULL, var_comp = FALSE,
                         var_method = "jackknife", fast_path = TRUE,
-                        data = NULL) {
+                        data = NULL, cens_group = NULL) {
   
   cl <- match.call()
   formula_info <- NULL
   
   # --- Formula --------------------------------------------------------------
   if (inherits(t, "formula")) {
-    names(cl)[names(cl) == "t"] <- ""   # Call: mostra a formula sem "t ="
+    names(cl)[names(cl) == "t"] <- ""   # Call: shows the formula without "t ="
     md <- .qast_model_data(t, data, parent.frame())
     t <- md$t; qt <- md$qt; status <- md$status; z <- md$z
     formula_info <- md$info
@@ -98,7 +112,7 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   if (missing(L)) stop("L (truncation time) is required", call. = FALSE)
   L <- unname(L)
   
-  # --- Validacao -------------------------------------------------------------
+  # --- Validation -----------------------------------------------------------
   method <- match.arg(method,
                       c("uobyqa", "mads", "Nelder-Mead", "subplex", "BB", "SANN",
                         "bobyqa", "newuoa", "hjkb", "BFGS"))
@@ -113,16 +127,27 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   .validate_qast_data(t, qt, status, z, h1, h2, L = L)
   method <- .qast_method_for_p(method, NCOL(z))
   
-  # Covariaveis discretas: premissa central do modelo de Fine e Gelber
+  # Discrete covariates: central assumption of the Fine and Gelber model
   z <- validate_discrete_z(z)
-  validate_no_constant_z(z)   # sem intercepto / grupo vazio
-  z_full_rank <- warn_collinear_z(z)   # aviso, nao erro
-  # Em double uma vez: com inteiros o RcppArmadillo converteria z e status
-  # a cada avaliacao dos kernels.
+  validate_no_constant_z(z)   # no intercept / empty group
+  z_full_rank <- warn_collinear_z(z)   # warning, not error
+  # As double once: with integers RcppArmadillo would convert z and status
+  # at every evaluation of the kernels.
   storage.mode(z) <- "double"
   status <- as.numeric(status)
+
+  # Censoring partition (Fine and Gelber, 2001): no stratification by default
+  if (!is.null(cens_group)) {
+    if (length(cens_group) != length(t))
+      stop(sprintf("cens_group must have one value per observation (%d)",
+                   length(t)), call. = FALSE)
+    if (anyNA(cens_group))
+      .qast_stop_at("cens_group contains NA", which(is.na(cens_group)))
+  }
+  cgroup <- fg_cens_partition(z, cens_group)
+  .fg_check_cens_at_L(t, status, cgroup, L)
   
-  # --- Pre-computacao (constantes na otimizacao) -----------------------------
+  # --- Precomputation (constants in the optimization) -----------------------
   lt <- h1$linkfun(t)
   lq <- h2$linkfun(qt)
   hL <- h1$linkfun(L)
@@ -164,7 +189,7 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   }
   
   # ---------------------------------------------------------------------------
-  # Etapa 1: Estimacao de Beta (mesma equacao do modelo proposto)
+  # Stage 1: estimation of beta (same equation as the proposed model)
   # ---------------------------------------------------------------------------
   U1min <- run_optimizer(init_coef(lt, z),
                          function(beta) U1_obj_cpp(beta, lt, z,
@@ -174,9 +199,10 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   betahat <- U1min$par
   
   # ---------------------------------------------------------------------------
-  # Variancia de Beta (var_comp = TRUE)
+  # Variance of beta (var_comp = TRUE)
   # ---------------------------------------------------------------------------
   vcov_beta <- NULL
+  replicates <- list(beta = NULL, theta = NULL)
   if (var_comp) {
     
     refit_beta <- function(t_sub, z_sub, status_sub) {
@@ -186,9 +212,9 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
                                            status_sub, norm_min))$par
     }
     
-    # O jackknife de beta e feito junto com o de theta (abaixo): o refit
-    # de theta usa o betahat da amostra completa, entao as estimativas por
-    # replica sao as mesmas de passadas separadas.
+    # The jackknife of beta is done together with that of theta (below): the
+    # theta refit uses the betahat of the full sample, so the estimates per
+    # replicate are the same as in separate passes.
 
     if (var_method == "bootstrap") {
       dat <- data.frame(t, status, z)
@@ -203,18 +229,19 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
         }
       )
       vcov_beta <- cov(boot_out$t)
+      replicates$beta <- .qast_boot_reps(boot_out)
     }
   }
   
   # ---------------------------------------------------------------------------
-  # Etapa 2: Estimacao de Theta
+  # Stage 2: estimation of theta
   #
-  #   stage2_env(): monta o objetivo de uma (sub)amostra
-  #     - identity: forma afim alpha + W theta, O(p^2) por avaliacao
-  #     - piecewise: soma sobre os pares validos, O(nnz) por avaliacao
-  #   solve_theta(): forma fechada (identity + L2 + fast_path) ou otimizador
+  #   stage2_env(): builds the objective of a (sub)sample
+  #     - identity: affine form alpha + W theta, O(p^2) per evaluation
+  #     - piecewise: sum over the valid pairs without storing them, O(n log^2 n)
+  #   solve_theta(): closed form (identity + L2 + fast_path) or optimizer
   # ---------------------------------------------------------------------------
-  km_surv <- prep_km_by_column(z, t, status)
+  km_surv <- prep_km_by_column(z, t, status, group = cgroup)
   
   stage2_env <- function(lt_s, lq_s, z_s, status_s, km_s) {
     if (phi == "identity") {
@@ -227,19 +254,24 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
         can_fast = TRUE
       )
     } else {
-      pairs <- make_fg_pairs(lt_s, lq_s, z_s, status_s,
-                             betahat, hL, km_s, phi)
-      list(
-        fn = function(th) eval_fg_obj(pairs, lq_s, z_s, th, "piecewise",
-                                      norm_min),
-        affine = NULL,
-        can_fast = FALSE
-      )
+      # Without explicit pairs: active members and a divide-and-conquer
+      # sum, O(n) memory and O(n log^2 n) per evaluation. Weights outside
+      # the safe range (see fg_pairs_core.cpp): explicit pairs.
+      lean <- make_fg_pw_lean_cpp(lt_s, lq_s, z_s, status_s, betahat, hL,
+                                  km_s)
+      fn <- if (isTRUE(attr(lean, "meta")$ok)) {
+        function(th) eval_fg_obj_pw_lean_cpp(lean, lq_s, z_s, th, norm_min)
+      } else {
+        pairs <- make_fg_pairs(lt_s, lq_s, z_s, status_s,
+                               betahat, hL, km_s, phi)
+        function(th) eval_fg_obj(pairs, lq_s, z_s, th, "piecewise", norm_min)
+      }
+      list(fn = fn, affine = NULL, can_fast = FALSE)
     }
   }
   
-  # Forma fechada quando possivel; posto deficiente ou gradiente residual
-  # alto -> warning e otimizador sobre o mesmo objetivo afim.
+  # Closed form when possible; rank deficiency or a large residual
+  # gradient -> warning and the optimizer on the same affine objective.
   solve_theta <- function(s2, par0) {
     if (fast_path && s2$can_fast && norm_min == "L2") {
       rcond <- 1e-10
@@ -248,9 +280,9 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
           sol$grad_norm < 1e-6) {
         return(list(par = sol$par, converged = TRUE))
       }
-      # Se z inteiro ja foi sinalizado como colinear, este aviso repete a
-      # mesma causa; so e emitido quando a perda de posto e nova (ex.:
-      # uma replica de jackknife/bootstrap degenerada).
+      # If the whole z was already flagged as collinear, this warning repeats
+      # the same cause; it is issued only when the rank loss is new (e.g. a
+      # degenerate jackknife/bootstrap replicate).
       if (z_full_rank) warning(
         "fast_path: rank-deficient system or large residual gradient ",
         sprintf("(rcond = %.2g, full_rank = %s, grad_norm = %.2g). ",
@@ -269,37 +301,40 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   thetahat <- solve_theta(stage2, init_coef(lq, z))$par
   
   # ---------------------------------------------------------------------------
-  # Variancia de Theta (var_comp = TRUE)
+  # Variance of theta (var_comp = TRUE)
   #
-  # Por replica: pesos KM, pares e objetivo reconstruidos na subamostra e
-  # resolvidos pelo mesmo caminho da estimativa pontual.
+  # Per replicate: KM weights, pairs and objective rebuilt on the subsample
+  # and solved by the same path as the point estimate.
   # ---------------------------------------------------------------------------
   vcov_theta <- NULL
   if (var_comp) {
     
-    refit_theta <- function(t_sub, qt_sub, status_sub, z_sub) {
+    refit_theta <- function(t_sub, qt_sub, status_sub, z_sub, g_sub) {
       lq_sub <- h2$linkfun(qt_sub)
       lt_sub <- h1$linkfun(t_sub)
-      km_surv_sub <- prep_km_by_column(z_sub, t_sub, status_sub)
+      km_surv_sub <- prep_km_by_column(z_sub, t_sub, status_sub,
+                                       group = droplevels(g_sub))
       s2 <- stage2_env(lt_sub, lq_sub, z_sub, status_sub, km_surv_sub)
       solve_theta(s2, thetahat)$par
     }
     
     if (var_method == "jackknife") {
-      # beta e theta numa so passada (ver R/utils_jackknife.R)
+      # beta and theta in a single pass (see R/utils_jackknife.R)
       p <- ncol(z)
       jk <- .jackknife_se(
         n,
         refit = function(i) {
           z_i <- z[-i, , drop = FALSE]
           c(refit_beta(t[-i], z_i, status[-i]),
-            refit_theta(t[-i], qt[-i], status[-i], z_i))
+            refit_theta(t[-i], qt[-i], status[-i], z_i, cgroup[-i]))
         },
         blocks = list(beta = seq_len(p), theta = p + seq_len(p)),
         cov = TRUE
       )
       vcov_beta  <- jk$beta$cov
       vcov_theta <- jk$theta$cov
+      replicates <- list(beta = .qast_jack_reps(jk$beta),
+                         theta = .qast_jack_reps(jk$theta))
     }
 
     if (var_method == "bootstrap") {
@@ -310,10 +345,11 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
         ncpus = .qast_workers(),
         statistic = function(data, ind) {
           refit_theta(data[ind, 1], data[ind, 2], data[ind, 3],
-                      as.matrix(data[ind, -(1:3)]))
+                      as.matrix(data[ind, -(1:3)]), cgroup[ind])
         }
       )
       vcov_theta <- cov(boot_out$t)
+      replicates$theta <- .qast_boot_reps(boot_out)
     }
   }
   
@@ -323,8 +359,29 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
     vcov_beta = vcov_beta, vcov_theta = vcov_theta,
     var_comp = var_comp, var_method = var_method, M = M,
     lt = lt, lq = lq, t = t, qt = qt, formula_info = formula_info,
+    replicates = replicates,
     settings = list(h1 = h1_name, h2 = h2_name, method = method,
                     norm_min = norm_min, L = L, phi = phi,
-                    fast_path = fast_path)
+                    fast_path = fast_path, cens_group = cgroup,
+                    cens_group_default = is.null(cens_group))
   )
 }
+
+# H_G(L) > 0 in every censoring group (Fine and Gelber, 2001)
+.fg_check_cens_at_L <- function(t, status, group, L) {
+  bad <- character()
+  for (g in levels(group)) {
+    i <- group == g
+    if (!any(status[i] == 0)) next
+    f <- survival::survfit(survival::Surv(t[i], 1 - status[i]) ~ 1)
+    k <- findInterval(L, f$time)
+    if (k > 0L && f$surv[k] <= 0) bad <- c(bad, g)
+  }
+  if (length(bad))
+    warning(sprintf(paste0("the censoring survival is 0 at L in %d censoring ",
+                           "group(s); L must satisfy H_G(L) > 0 (reduce L ",
+                           "or a coarser cens_group)"), length(bad)),
+            call. = FALSE)
+  invisible(bad)
+}
+

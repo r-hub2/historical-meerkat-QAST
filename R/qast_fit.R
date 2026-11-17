@@ -1,10 +1,10 @@
 # R/qast_fit.R
 #
-# Interface comum dos modelos: resposta Qsurv() para formulas, validacao
-# das entradas e a classe S3 "qast_fit" (print, summary, coef, vcov).
+# Common interface of the models: Qsurv() response for formulas, input
+# validation and the S3 class "qast_fit" (print, summary, coef, vcov).
 
 # ---------------------------------------------------------------------------
-# Resposta para formulas
+# Response for formulas
 # ---------------------------------------------------------------------------
 
 #' Response for QAST model formulas
@@ -33,10 +33,10 @@ Qsurv <- function(time, qtime, status) {
   out
 }
 
-# Converte formula + data nas entradas dos modelos. A matriz de covariaveis
-# e o model.matrix sem a coluna do intercepto (o modelo nao o estima);
-# fatores entram como k - 1 indicadoras. NAs seguem adiante e sao
-# reportados pela validacao.
+# Converts formula + data into the model inputs. The covariate matrix is
+# the model.matrix without the intercept column (the model does not
+# estimate it); factors enter as k - 1 indicators. NAs go on and are
+# reported by the validation.
 .qast_model_data <- function(formula, data, env) {
   if (is.null(data)) data <- env
   mf <- stats::model.frame(formula, data = data, na.action = stats::na.pass)
@@ -58,10 +58,10 @@ Qsurv <- function(time, qtime, status) {
 }
 
 # ---------------------------------------------------------------------------
-# Validacao das entradas
+# Input validation
 # ---------------------------------------------------------------------------
 
-# Erro com as primeiras posicoes problematicas
+# Error with the first offending positions
 .qast_stop_at <- function(what, idx) {
   shown <- utils::head(idx, 5L)
   more <- if (length(idx) > 5L) sprintf(" (and %d more)", length(idx) - 5L) else ""
@@ -69,8 +69,8 @@ Qsurv <- function(time, qtime, status) {
        call. = FALSE)
 }
 
-# Validacao comum a semi_aft_fg e semi_aft_prop. h1/h2 sao os objetos de
-# make.link; L e opcional (so o modelo de Fine e Gelber o usa).
+# Validation shared by semi_aft_fg and semi_aft_prop. h1/h2 are make.link
+# objects; L is optional (only the Fine and Gelber model uses it).
 .validate_qast_data <- function(t, qt, status, z, h1, h2, L = NULL) {
   if (!is.numeric(t) || !is.numeric(qt))
     stop("t and qt must be numeric", call. = FALSE)
@@ -100,8 +100,8 @@ Qsurv <- function(time, qtime, status) {
   if (any(!is.finite(qt) | qt < 0))
     .qast_stop_at("qt must be finite and non-negative",
                   which(!is.finite(qt) | qt < 0))
-  # Utilidades em [0, 1]: o tempo ajustado nao excede o de sobrevivencia
-  # (folga relativa para arredondamento)
+  # Utilities in [0, 1]: the adjusted time does not exceed the survival
+  # time (relative slack for rounding)
   over <- which(qt > t * (1 + 1e-8))
   if (length(over))
     .qast_stop_at("qt (quality-adjusted time) greater than t; check that the arguments are not swapped",
@@ -125,9 +125,9 @@ Qsurv <- function(time, qtime, status) {
   invisible(TRUE)
 }
 
-# Metodos que nao aceitam um unico coeficiente (dfoptim::nmk e mads pedem
-# optimize(); minqa::uobyqa/bobyqa e hjkb nao convergem com p = 1): com
-# uma covariavel, usa subplex, tambem sem derivadas.
+# Methods that do not accept a single coefficient (dfoptim::nmk and mads
+# call optimize(); minqa::uobyqa/bobyqa and hjkb do not converge with
+# p = 1): with one covariate, use subplex, also derivative-free.
 .qast_method_for_p <- function(method, p) {
   if (p == 1L && method %in% c("Nelder-Mead", "uobyqa", "mads", "bobyqa",
                                "hjkb")) {
@@ -138,7 +138,7 @@ Qsurv <- function(time, qtime, status) {
   method
 }
 
-# M e obrigatorio so no bootstrap
+# M is required only for the bootstrap
 .validate_var_args <- function(var_comp, var_method, M) {
   if (!is.logical(var_comp) || length(var_comp) != 1L || is.na(var_comp))
     stop("var_comp must be TRUE or FALSE", call. = FALSE)
@@ -152,47 +152,51 @@ Qsurv <- function(time, qtime, status) {
 }
 
 # ---------------------------------------------------------------------------
-# Interceptos e distribuicao dos residuos
+# Intercepts and distribution of the residuals
 # ---------------------------------------------------------------------------
-# As equacoes de posto sao invariantes a deslocamento e nao identificam o
-# intercepto. Depois do ajuste, a distribuicao dos residuos de cada
-# componente e estimada e guardada no qast_fit; o intercepto e a media
-# dela e predict(type = "survival") a usa em S(t | z) = S_res(h(t) - z'b).
+# The rank estimating equations are invariant to shifts and do not
+# identify the intercept. After the fit, the distribution of the residuals
+# of each component is estimated and stored in the qast_fit; the intercept
+# is its mean and predict(type = "survival") uses it in S(t | z) = S_res(h(t) - z'b).
 
-# Tempo de sobrevivencia: curva de Kaplan-Meier dos residuos
-# e = h1(t) - z'beta (degraus continuos a direita: S(x) = P(e > x)).
+# Survival time: Kaplan-Meier curve of the residuals
+# e = h1(t) - z'beta (right-continuous steps: S(x) = P(e > x)).
 .resid_dist_km <- function(e, status) {
   f <- survival::survfit(survival::Surv(e, status) ~ 1)
   list(time = f$time, surv = f$surv)
 }
 
-# Tempo ajustado por qualidade: distribuicao de Zhao e Tsiatis dos
-# residuos r = h2(qt) - z'theta. Cada evento recebe massa
-# 1 / (n G(t_i)), com G o KM da censura na escala do tempo de
-# sobrevivencia (G = 0 -> massa 0, como no kernel de surv_qt_fun);
-# massas de residuos empatados sao somadas.
-.resid_dist_ipcw <- function(r, t, status) {
-  G <- km_weights_at(t, status)
+# Quality-adjusted time: Zhao and Tsiatis distribution of the residuals
+# r = h2(qt) - z'theta. Each event gets mass 1 / (n G(t_i)), with G the
+# censoring KM on the survival time scale (G = 0 -> mass 0, as in the
+# surv_qt_fun kernel); the masses of tied residuals are added up. G is
+# the marginal KM by default; the Fine and Gelber fits pass their H_G.
+.resid_dist_ipcw <- function(r, t, status, G = km_weights_at(t, status)) {
   w <- ifelse(status == 1 & is.finite(G) & G > 0, 1 / G, 0) / length(r)
   keep <- w > 0
-  mass <- tapply(w[keep], r[keep], sum)
-  list(value = as.numeric(names(mass)), mass = unname(as.vector(mass)))
+  # Exact values (not through names/character, which round to 15 digits
+  # and would shift the jumps)
+  v <- r[keep]
+  u <- sort(unique(v))
+  mass <- as.vector(rowsum(w[keep], match(v, u), reorder = TRUE))
+  list(value = u, mass = mass)
 }
 
-# Media da curva KM (Ding e Nan, 2015), restrita ao maior residuo: a massa
-# que sobra no fim da curva (maior residuo censurado) fica nesse ponto.
-# Calculada pelos saltos, e nao pelo rmean do survfit, que integra a partir
-# de min(e) sem soma-lo de volta quando ha residuos negativos.
+# Mean of the KM curve (Ding and Nan, 2015), restricted to the largest
+# residual: the mass left at the end of the curve (largest residual
+# censored) stays at that point. Computed from the jumps, and not by the
+# rmean of survfit, which integrates from min(e) without adding it back
+# when there are negative residuals.
 .km_mean <- function(d) {
   s <- d$surv
   k <- length(s)
   sum(-diff(c(1, s)) * d$time) + s[k] * d$time[k]
 }
 
-# Media IPCW (Zhao e Tsiatis, 2000): (1/n) sum status_i r_i / G(t_i)
+# IPCW mean (Zhao and Tsiatis, 2000): (1/n) sum status_i r_i / G(t_i)
 .ipcw_mean <- function(d) sum(d$mass * d$value)
 
-# S(x) = P(e > x) na curva KM; 1 antes do primeiro salto
+# S(x) = P(e > x) on the KM curve; 1 before the first jump
 .surv_km_at <- function(d, x) {
   idx <- findInterval(x, d$time)
   out <- d$surv[pmax(idx, 1L)]
@@ -200,8 +204,8 @@ Qsurv <- function(time, qtime, status) {
   out
 }
 
-# S(x) = P(r > x) = soma das massas dos residuos > x, limitada a [0, 1]
-# (a massa total do IPCW e proxima de 1, mas nao exatamente 1)
+# S(x) = P(r > x) = sum of the masses of the residuals > x, bounded to [0, 1]
+# (the total IPCW mass is close to 1, but not exactly 1)
 .surv_ipcw_at <- function(d, x) {
   tail_mass <- rev(cumsum(rev(d$mass)))
   idx <- findInterval(x, d$value) + 1L
@@ -209,21 +213,28 @@ Qsurv <- function(time, qtime, status) {
   pmin(pmax(out, 0), 1)
 }
 
-.qast_resid_dists <- function(lt, lq, t, status, z, betahat, thetahat) {
+.qast_resid_dists <- function(lt, lq, t, status, z, betahat, thetahat,
+                              G = km_weights_at(t, status)) {
   list(beta  = .resid_dist_km(lt - drop(z %*% betahat), status),
-       theta = .resid_dist_ipcw(lq - drop(z %*% thetahat), t, status))
+       theta = .resid_dist_ipcw(lq - drop(z %*% thetahat), t, status, G))
 }
 
 # ---------------------------------------------------------------------------
-# Classe qast_fit
+# Class qast_fit
 # ---------------------------------------------------------------------------
 
 .new_qast_fit <- function(model, call, z, status, betahat, thetahat,
                           vcov_beta, vcov_theta, var_comp, var_method, M,
-                          settings, lt, lq, t, qt, formula_info = NULL) {
+                          settings, lt, lq, t, qt, formula_info = NULL,
+                          replicates = NULL) {
   nms <- colnames(z)
   names(betahat) <- names(thetahat) <- nms
-  rd <- .qast_resid_dists(lt, lq, t, status, z, betahat, thetahat)
+  # Censoring: in the Fine and Gelber model, the KM of the partition of the
+  # fit (H_G, the same as the equations and the diagnostic); in the proposed one, the marginal KM
+  G <- if (model == "fg" && !is.null(settings$cens_group))
+    km_weights_by_group(t, status, settings$cens_group)
+  else km_weights_at(t, status)
+  rd <- .qast_resid_dists(lt, lq, t, status, z, betahat, thetahat, G)
   fit <- list(beta = betahat, theta = thetahat,
               intercept = c(beta = .km_mean(rd$beta),
                             theta = .ipcw_mean(rd$theta)))
@@ -241,16 +252,30 @@ Qsurv <- function(time, qtime, status) {
   fit$var_method <- if (var_comp) var_method else NULL
   fit$M <- if (var_comp && var_method == "bootstrap") M else NULL
   fit$settings <- settings
-  # Para predict(): covariaveis do ajuste, distribuicao dos residuos,
-  # tempos de evento (grade padrao) e, nas formulas, termos e niveis
+  # For predict(): covariates of the fit, distribution of the residuals,
+  # event times (default grid) and, for formulas, terms and levels
   fit$z <- z
   fit$y <- cbind(time = t, qtime = qt, status = status)
   fit$resid_dist <- rd
   fit$event_times <- list(beta  = sort(unique(t[status == 1])),
                           theta = sort(unique(qt[status == 1])))
   fit$formula_info <- formula_info
+  # Variance replicates (coefficients + rows used) for
+  # predict(se.fit = TRUE)
+  fit$replicates <- if (var_comp) replicates else NULL
   class(fit) <- "qast_fit"
   fit
+}
+
+# L, phi and censoring partition of the Fine and Gelber model
+.qast_print_fg_settings <- function(settings, digits) {
+  cat("L = ", format(settings$L, digits = digits), ", phi = ",
+      settings$phi, sep = "")
+  if (!is.null(settings$cens_group))
+    cat(", censoring groups = ", nlevels(settings$cens_group),
+        if (isTRUE(settings$cens_group_default)) " (no stratification)",
+        sep = "")
+  cat("\n")
 }
 
 .qast_model_label <- function(model) {
@@ -290,8 +315,12 @@ Qsurv <- function(time, qtime, status) {
 #'     (Zhao and Tsiatis, 2000), with the Kaplan-Meier censoring
 #'     survival \eqn{\hat G}{G} evaluated at the survival time:
 #'     \eqn{n^{-1}\sum_i \delta_i r_i / \hat G(T_i)}{(1/n) sum_i delta_i r_i / G(T_i)}.
-#'     This is the mean of the distribution estimated by
-#'     \code{\link{surv_qt_fun}}.
+#'     For \code{semi_aft_prop()} fits, \eqn{\hat G}{G} is the marginal
+#'     Kaplan-Meier, and this is the mean of the distribution estimated by
+#'     \code{\link{surv_qt_fun}}; for \code{semi_aft_fg()} fits, it is the
+#'     Kaplan-Meier within the censoring groups of the fit
+#'     (\code{cens_group}), the same weights as the estimating function
+#'     (the marginal one without stratification, the default).
 #' }
 #' The linear predictor of the transformed time is then
 #' \code{intercept["beta"] + z \%*\% beta} (and likewise with
@@ -343,9 +372,7 @@ print.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L),
     cat("\n")
   }
   cat("n = ", x$n, ", number of events = ", x$n_events, "\n", sep = "")
-  if (x$model == "fg")
-    cat("L = ", format(x$settings$L, digits = digits), ", phi = ",
-        x$settings$phi, "\n", sep = "")
+  if (x$model == "fg") .qast_print_fg_settings(x$settings, digits)
   cat("\nCoefficients:\n")
   print(coef(x), digits = digits)
   cat("\nIntercepts (mean of the residuals):\n")
@@ -419,9 +446,7 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
     print(x$call)
   }
   cat("n = ", x$n, ", number of events = ", x$n_events, "\n", sep = "")
-  if (x$model == "fg")
-    cat("L = ", format(x$settings$L, digits = digits), ", phi = ",
-        x$settings$phi, "\n", sep = "")
+  if (x$model == "fg") .qast_print_fg_settings(x$settings, digits)
   if (!is.null(x$var_method))
     cat("Variance: ", x$var_method,
         if (!is.null(x$M)) paste0(" (M = ", x$M, ")"), "\n", sep = "")
@@ -444,9 +469,9 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 # predict
 # ---------------------------------------------------------------------------
 
-# Matriz de covariaveis para predict(): formula -> model.matrix com os
-# termos, niveis e contrastes do ajuste; matriz -> colunas pelo nome (ou
-# pela posicao, se o ajuste nao tinha nomes)
+# Covariate matrix for predict(): formula -> model.matrix with the terms,
+# levels and contrasts of the fit; matrix -> columns by name (or by
+# position, if the fit had no names)
 .qast_newdata_z <- function(object, newdata) {
   if (is.null(newdata)) return(object$z)
   p <- length(object$beta)
@@ -477,24 +502,67 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
   z
 }
 
-# S(t | z_k) numa grade de tempos, para um componente
-.qast_predict_surv <- function(object, z, comp, times) {
+# Evaluation times in the domain of the link of the component
+.qast_check_times <- function(object, comp, times) {
   link <- stats::make.link(object$settings[[if (comp == "beta") "h1" else "h2"]])
   if (is.null(times)) times <- object$event_times[[comp]]
   if (!is.numeric(times) || anyNA(times))
     stop("times must be a numeric vector without NA", call. = FALSE)
-  ht <- link$linkfun(times)
+  ht <- suppressWarnings(link$linkfun(times))   # NaN handled below
   if (any(!is.finite(ht)))
     stop(sprintf("times must be in the domain of the link \"%s\" (with log, > 0)",
                  link$name), call. = FALSE)
-  lp <- drop(z %*% object[[comp]])
-  x <- outer(-lp, ht, `+`)          # residuo: h(t) - z'b
+  list(times = times, ht = ht)
+}
+
+# S(t | z_k) on a grid of times (ht = h(times)), given the distribution of
+# the residuals and the coefficients of a component
+.qast_surv_matrix <- function(dist, coef, z, ht, comp) {
+  lp <- drop(z %*% coef)
+  x <- outer(-lp, ht, `+`)          # residual: h(t) - z'b
   surv_at <- if (comp == "beta") .surv_km_at else .surv_ipcw_at
-  out <- matrix(surv_at(object$resid_dist[[comp]], as.vector(x)),
-                nrow = nrow(x))
-  dimnames(out) <- list(rownames(z), format(times, digits = 6L,
-                                            trim = TRUE))
-  out
+  matrix(surv_at(dist, as.vector(x)), nrow = nrow(x))
+}
+
+# Distribution of the residuals of a component recomputed on the rows
+# 'rows' of the data of the fit (jackknife or bootstrap replicate), with
+# the same estimators and censoring weights as the fit
+.qast_dist_rows <- function(object, comp, rows, coef) {
+  y <- object$y[rows, , drop = FALSE]
+  z <- object$z[rows, , drop = FALSE]
+  t <- y[, "time"]; status <- y[, "status"]
+  if (comp == "beta") {
+    lt <- stats::make.link(object$settings$h1)$linkfun(t)
+    return(.resid_dist_km(lt - drop(z %*% coef), status))
+  }
+  lq <- stats::make.link(object$settings$h2)$linkfun(y[, "qtime"])
+  G <- if (object$model == "fg" && !is.null(object$settings$cens_group))
+    km_weights_by_group(t, status, object$settings$cens_group[rows])
+  else km_weights_at(t, status)
+  .resid_dist_ipcw(lq - drop(z %*% coef), t, status, G)
+}
+
+# Rows and coefficients of each replicate of a component
+.qast_rep_list <- function(object, comp) {
+  rp <- object$replicates[[comp]]
+  if (is.null(rp))
+    stop(sprintf(paste0("the fit has no variance replicates for %s; refit ",
+                        "with var_comp = TRUE"), comp), call. = FALSE)
+  n <- object$n
+  lapply(seq_len(nrow(rp$reps)), function(k) list(
+    coef = rp$reps[k, ],
+    rows = if (!is.null(rp$drop)) seq_len(n)[-rp$drop[k]] else rp$index[k, ]))
+}
+
+# Standard deviation of the replicates, with the vcov() formula: jackknife
+# sqrt((n - 1) / n_valid * sum of squared deviations); bootstrap sd()
+.qast_rep_se <- function(object, vals) {
+  if (identical(object$var_method, "jackknife")) {
+    nv <- ncol(vals)
+    sqrt((object$n - 1) / nv * rowSums((vals - rowMeans(vals))^2))
+  } else {
+    apply(vals, 1L, stats::sd)
+  }
 }
 
 #' Predictions from QAST fits
@@ -522,11 +590,25 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #'     Its total mass is close to, but not exactly, 1, so the estimates
 #'     are truncated to [0, 1].
 #' }
-#' Both use the Kaplan-Meier (marginal) censoring distribution, which
-#' assumes censoring independent of the covariates. The survival
+#' The censoring is the Kaplan-Meier: within the censoring groups of the
+#' fit for \code{semi_aft_fg()} (\code{cens_group}; marginal without
+#' stratification, the default), as in the estimating function; marginal
+#' for \code{semi_aft_prop()}, which assumes censoring independent of the
+#' covariates (the fit itself uses a Cox model). The survival
 #' probabilities are \eqn{P(T > t \mid z)}{P(T > t | z)} (right-continuous
-#' steps). \code{surv_qt_fun()} evaluates each subject at its own
-#' residual with \eqn{\ge}{>=}, i.e. \eqn{P(r \ge r_i)}{P(r >= r_i)}.
+#' steps), the same convention as \code{surv_qt_fun()}.
+#'
+#' With \code{se.fit = TRUE} (fits with \code{var_comp = TRUE}), the
+#' prediction is recomputed in every jackknife or bootstrap replicate of
+#' the fit: the replicate coefficients, and the intercept and the residual
+#' distribution re-estimated on the data of the replicate, with the same
+#' censoring weights. The standard errors use the same formula as
+#' \code{vcov()}: the delete-1 jackknife variance or the bootstrap sample
+#' variance. The survival intervals are pointwise: normal
+#' (\eqn{\pm z_{1-\alpha/2}}{+/- z} times the standard error) for the
+#' jackknife, percentile for the bootstrap, truncated to [0, 1]. The
+#' censoring weights are re-estimated in every replicate, as in the
+#' variance of the coefficients.
 #'
 #' @param object Object of class \code{"qast_fit"}
 #' @param newdata Covariates to predict for. For fits from a formula, a
@@ -543,12 +625,19 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #'   the original scale (survival time for \code{beta}, quality-adjusted
 #'   time for \code{theta}). \code{NULL} (default) uses the distinct
 #'   event times of the fit data of each component.
+#' @param se.fit If TRUE, also returns standard errors (and, for
+#'   \code{type = "survival"}, pointwise confidence limits) from the
+#'   variance replicates of the fit; requires \code{var_comp = TRUE}
+#' @param level Confidence level of the survival intervals
 #' @param ... Not used
 #' @return For \code{type = "lp"}: a vector (one component) or a matrix
-#'   with columns \code{beta} and \code{theta}. For
+#'   with columns \code{beta} and \code{theta}; with \code{se.fit = TRUE},
+#'   a list with \code{fit} and \code{se.fit} of the same shape. For
 #'   \code{type = "survival"}: a matrix with one row per subject of
 #'   \code{newdata} and one column per time (one component), or a list
-#'   with the matrices \code{beta} and \code{theta}.
+#'   with the matrices \code{beta} and \code{theta}; with
+#'   \code{se.fit = TRUE}, each matrix is replaced by a list with
+#'   \code{surv}, \code{se}, \code{lower} and \code{upper}.
 #' @references Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator
 #'   for the distribution of quality adjusted survival time.
 #'   \emph{Biometrika}, 84(2), 339-348. \doi{10.1093/biomet/84.2.339}
@@ -568,30 +657,91 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #' s <- predict(fit, new, type = "survival", times = c(0.5, 1, 2))
 #' s$beta                                  # P(T > t | z)
 #' s$theta                                 # P(Q > t | z)
+#'
+#' # Standard errors and pointwise 95% intervals (jackknife replicates)
+#' fit_v <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d,
+#'                        var_comp = TRUE)
+#' predict(fit_v, new, se.fit = TRUE)
+#' predict(fit_v, new, type = "survival", component = "theta",
+#'         times = c(0.5, 1), se.fit = TRUE)
 #' @export
 predict.qast_fit <- function(object, newdata = NULL,
                              type = c("lp", "survival"),
                              component = c("both", "beta", "theta"),
-                             times = NULL, ...) {
+                             times = NULL, se.fit = FALSE, level = 0.95,
+                             ...) {
   type <- match.arg(type)
   component <- match.arg(component)
   if (is.null(object$resid_dist))
     stop("this fit has no stored residual distribution; refit it with ",
          "the current version of QAST", call. = FALSE)
+  if (!is.logical(se.fit) || length(se.fit) != 1L || is.na(se.fit))
+    stop("se.fit must be TRUE or FALSE", call. = FALSE)
+  if (!is.numeric(level) || length(level) != 1L || !(level > 0 && level < 1))
+    stop("level must be a number in (0, 1)", call. = FALSE)
+  if (se.fit && is.null(object$replicates))
+    stop("se.fit = TRUE requires the variance replicates: refit with ",
+         "var_comp = TRUE", call. = FALSE)
   z <- .qast_newdata_z(object, newdata)
   comps <- if (component == "both") c("beta", "theta") else component
+  reps <- if (se.fit)
+    lapply(stats::setNames(comps, comps), function(cp) {
+      lapply(.qast_rep_list(object, cp), function(r) {
+        r$dist <- .qast_dist_rows(object, cp, r$rows, r$coef)
+        r
+      })
+    })
 
   if (type == "lp") {
-    out <- vapply(comps, function(cp)
-      object$intercept[[cp]] + drop(z %*% object[[cp]]),
-      numeric(nrow(z)))
+    lp_of <- function(cp) object$intercept[[cp]] + drop(z %*% object[[cp]])
+    out <- vapply(comps, lp_of, numeric(nrow(z)))
     if (!is.matrix(out)) out <- matrix(out, nrow = nrow(z),
                                        dimnames = list(NULL, comps))
     rownames(out) <- rownames(z)
+    if (se.fit) {
+      se <- vapply(comps, function(cp) {
+        vals <- vapply(reps[[cp]], function(r) {
+          a <- if (cp == "beta") .km_mean(r$dist) else .ipcw_mean(r$dist)
+          a + drop(z %*% r$coef)
+        }, numeric(nrow(z)))
+        .qast_rep_se(object, matrix(vals, nrow = nrow(z)))
+      }, numeric(nrow(z)))
+      if (!is.matrix(se)) se <- matrix(se, nrow = nrow(z),
+                                       dimnames = list(NULL, comps))
+      rownames(se) <- rownames(z)
+      if (length(comps) == 1L) return(list(fit = out[, 1L], se.fit = se[, 1L]))
+      return(list(fit = out, se.fit = se))
+    }
     return(if (length(comps) == 1L) out[, 1L] else out)
   }
 
-  out <- lapply(stats::setNames(comps, comps), function(cp)
-    .qast_predict_surv(object, z, cp, times))
+  out <- lapply(stats::setNames(comps, comps), function(cp) {
+    tm <- .qast_check_times(object, cp, times)
+    est <- .qast_surv_matrix(object$resid_dist[[cp]], object[[cp]], z,
+                             tm$ht, cp)
+    dn <- list(rownames(z), format(tm$times, digits = 6L, trim = TRUE))
+    dimnames(est) <- dn
+    if (!se.fit) return(est)
+    # replicates: n_rep matrices (rows x times) stacked by column
+    vals <- vapply(reps[[cp]], function(r)
+      as.vector(.qast_surv_matrix(r$dist, r$coef, z, tm$ht, cp)),
+      numeric(length(est)))
+    vals <- matrix(vals, nrow = length(est))
+    se <- matrix(.qast_rep_se(object, vals), nrow = nrow(est),
+                 dimnames = dn)
+    if (identical(object$var_method, "jackknife")) {
+      q <- stats::qnorm(1 - (1 - level) / 2)
+      lower <- est - q * se; upper <- est + q * se
+    } else {
+      a <- (1 - level) / 2
+      lower <- matrix(apply(vals, 1L, stats::quantile, probs = a,
+                            names = FALSE), nrow = nrow(est))
+      upper <- matrix(apply(vals, 1L, stats::quantile, probs = 1 - a,
+                            names = FALSE), nrow = nrow(est))
+    }
+    lower <- pmin(pmax(lower, 0), 1); upper <- pmin(pmax(upper, 0), 1)
+    dimnames(lower) <- dimnames(upper) <- dn
+    list(surv = est, se = se, lower = lower, upper = upper)
+  })
   if (length(comps) == 1L) out[[1L]] else out
 }

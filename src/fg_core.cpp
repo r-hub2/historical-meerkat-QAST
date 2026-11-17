@@ -1,12 +1,12 @@
 // src/fg_core.cpp
 //
-// Kernel de referencia da U-estatistica de Fine e Gelber (2001): laco
-// direto O(nk * nl) sobre os pares de cada coluna binaria de z. Usado nos
-// testes A/B e benchmarks; semi_aft_fg usa o objeto de pares de
-// fg_pairs_core.cpp, que deve reproduzir este kernel.
+// Reference kernel of the U-statistic of Fine and Gelber (2001): a direct
+// O(nk * nl) loop over the pairs of each binary column of z. Used in the
+// A/B tests and benchmarks; semi_aft_fg uses the pairs object of
+// fg_pairs_core.cpp, which must reproduce this kernel.
 //
-// Para cada coluna j, a U-estatistica soma pares (a, b) com a no grupo
-// z[, j] == 0 e b no grupo z[, j] == 1.
+// For each column j, the U-statistic sums the pairs (a, b) with a in the
+// group z[, j] == 0 and b in the group z[, j] == 1.
 
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
@@ -16,18 +16,18 @@ using namespace arma;
 
 namespace fg_internal {
 
-// phi: funcao impar do estimador de theta
+// phi: odd function of the theta estimator
 inline double phi_apply(const double x, const std::string& phi) {
   if (phi == "identity") {
     return x;
   }
-  // "piecewise": sign(x), com 0 -> 0
+  // "piecewise": sign(x), with 0 -> 0
   if (x > 0.0) return 1.0;
   if (x < 0.0) return -1.0;
   return 0.0;
 }
 
-// Agregacao das componentes pela norma L1 ou L2
+// Aggregation of the components by the L1 or L2 norm
 inline double norm_aggregate(const arma::vec& parts,
                              const std::string& norm_min) {
   const double q = std::sqrt(static_cast<double>(parts.n_elem));
@@ -37,7 +37,7 @@ inline double norm_aggregate(const arma::vec& parts,
   return std::sqrt(arma::accu(arma::square(parts))) / q;
 }
 
-// Componentes da U-estatistica, uma por coluna binaria de z
+// Components of the U-statistic, one per binary column of z
 arma::vec u2_parts(const arma::vec& theta,
                    const arma::vec& lt,
                    const arma::vec& lq,
@@ -59,7 +59,7 @@ arma::vec u2_parts(const arma::vec& theta,
   
   for (int j = 0; j < p; ++j) {
     
-    // Grupos definidos pela covariavel discreta da coluna j
+    // Groups defined by the discrete covariate of column j
     const arma::uvec ik = arma::find(z.col(j) == 0.0);
     const arma::uvec il = arma::find(z.col(j) == 1.0);
     const int nk = static_cast<int>(ik.n_elem);
@@ -89,18 +89,18 @@ arma::vec u2_parts(const arma::vec& theta,
     for (int a = 0; a < nk; ++a) {
       for (int b = 0; b < nl; ++b) {
         
-        // Emparelhamento posicional: a < b (indices dentro dos grupos)
-        if (a >= b) continue;
-        
-        // Pares com evento em ambos (deltak * deltal)
+        // All cross pairs (a in group 0, b in group 1): with a binary Z,
+        // the Fine and Gelber sum over k < l of Z_kl U_kl is the sum over
+        // these pairs, each one once.
+        // Pairs with an event in both (deltak * deltal)
         if (dk(a) == 0.0 || dl(b) == 0.0) continue;
         
-        // Peso KM por grupo; descarta denominador nulo ou nao finito
+        // KM weight of each member; drops a null or non-finite denominator
         const double denom = wk(a) * wl(b);
         if (!(denom > 0.0) || !std::isfinite(denom)) continue;
         
-        // Indicador de truncacao: h1(L) - max(z_k'beta, z_l'beta)
-        //   maior que max(e1k, e1l)
+        // Truncation indicator: h1(L) - max(z_k'beta, z_l'beta)
+        //   greater than max(e1k, e1l)
         const double zk_beta = arma::dot(zk.row(a), beta);
         const double zl_beta = arma::dot(zl.row(b), beta);
         const double h1L =
@@ -110,7 +110,7 @@ arma::vec u2_parts(const arma::vec& theta,
         const double contrib =
         h1L * phi_apply(e2k(a) - e2l(b), phi) / denom;
         
-        // Fator (X_k - X_l) com X_k = 0 e X_l = 1
+        // Factor (X_k - X_l) with X_k = 0 and X_l = 1
         acc += -contrib;
       }
     }
@@ -122,21 +122,21 @@ arma::vec u2_parts(const arma::vec& theta,
 
 // U2_parts_fg_cpp
 //
-// Para cada covariavel binaria de z, calcula a componente da
-// U-estatistica de pares entre os grupos 0 e 1.
+// For each binary covariate of z, computes the component of the
+// U-statistic of pairs between the groups 0 and 1.
 //
-// Argumentos:
-//   theta  - coeficientes de qualidade-ajustada
-//   lt     - tempos de falha transformados por h1 (pre-computados)
-//   lq     - tempos ajustados por qualidade transformados por h2
-//   z      - matriz de covariaveis binarias (n x p)
-//   status - vetor indicador de evento (1 = evento)
-//   beta   - coeficientes de sobrevivencia (fixos nesta etapa)
-//   hL     - constante h1(L), pre-computada
-//   km_surv- lista de comprimento p com w0 e w1 por coluna
-//   phi    - funcao impar: "identity" ou "piecewise"
+// Arguments:
+//   theta  - quality-adjusted coefficients
+//   lt     - failure times transformed by h1 (precomputed)
+//   lq     - quality-adjusted times transformed by h2
+//   z      - binary covariate matrix (n x p)
+//   status - event indicator (1 = event)
+//   beta   - survival coefficients (fixed in this stage)
+//   hL     - constant h1(L), precomputed
+//   km_surv- list of length p with w0 and w1 per column
+//   phi    - odd function: "identity" or "piecewise"
 //
-// Retorna vetor numerico de comprimento p (sem atributo dim).
+// Returns a numeric vector of length p (without a dim attribute).
 // [[Rcpp::export]]
 Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta,
                                     const arma::vec& lt,
@@ -151,19 +151,19 @@ Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta,
   const arma::vec parts = fg_internal::u2_parts(theta, lt, lq, z, status,
                                                 beta, hL, km_surv, phi);
   
-  // NumericVector: um arma::vec exportado chegaria ao R como matriz p x 1
+  // NumericVector: an exported arma::vec would reach R as a p x 1 matrix
   return Rcpp::NumericVector(parts.begin(), parts.end());
 }
 
 // U2_obj_fg_cpp
 //
-// Norma (L1 ou L2) das componentes da U-estatistica, padronizada
-// por sqrt(p).
+// Norm (L1 or L2) of the components of the U-statistic, standardized
+// by sqrt(p).
 //
-// Argumentos: os mesmos de U2_parts_fg_cpp, mais:
-//   norm_min - norma de minimizacao ("L1" ou "L2")
+// Arguments: the same as U2_parts_fg_cpp, plus:
+//   norm_min - minimization norm ("L1" or "L2")
 //
-// Retorna escalar double com o valor da funcao objetivo.
+// Returns a double scalar with the value of the objective function.
 // [[Rcpp::export]]
 double U2_obj_fg_cpp(const arma::vec& theta,
                      const arma::vec& lt,

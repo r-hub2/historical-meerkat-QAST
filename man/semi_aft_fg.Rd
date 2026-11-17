@@ -19,7 +19,8 @@ semi_aft_fg(
   var_comp = FALSE,
   var_method = "jackknife",
   fast_path = TRUE,
-  data = NULL
+  data = NULL,
+  cens_group = NULL
 )
 }
 \arguments{
@@ -75,6 +76,20 @@ with \code{fast_path = FALSE}, theta is always estimated by
 
 \item{data}{Data frame with the formula variables, when \code{t} is a
 formula}
+
+\item{cens_group}{Censoring partition. The model assumes that the
+censoring depends on the covariates only through a discrete grouping
+G chosen by the analyst, and weights each subject by the Kaplan-Meier
+censoring survival of its group, \eqn{\hat H_G(X)}{H_G(X)}.
+\code{NULL} (default) does not stratify, as in the application of
+Fine and Gelber (2001). Otherwise, a vector with one value per
+observation defining the groups, e.g. a covariate associated with the
+censoring, or a discretized one (Fine and Gelber stratified by age
+dichotomized at the median as a sensitivity analysis). To choose it,
+one can check the effect of the covariates on the censoring, as in the
+article, e.g. with \code{survival::coxph(Surv(t, 1 - status) ~ z)}.
+\code{L} must satisfy \eqn{\hat H_G(L) > 0}{H_G(L) > 0} in every
+group (a warning flags the groups where it does not)}
 }
 \value{
 Object of class \code{"qast_fit"} (see \code{\link{qast_fit}}),
@@ -86,9 +101,10 @@ Object of class \code{"qast_fit"} (see \code{\link{qast_fit}}),
 \description{
 Fits the bivariate semiparametric accelerated failure time model of Fine
 and Gelber (2001) for the joint analysis of survival time and
-quality-adjusted survival time. The model works on pairs of subjects
-between the groups defined by each binary covariate, with Kaplan-Meier
-censoring weights per group and truncation at \code{L}.
+quality-adjusted survival time. The estimating function of the
+quality-adjusted coefficients is a U-statistic over all pairs of
+subjects, truncated at \code{L} and weighted by the inverse of the
+Kaplan-Meier censoring survival in the censoring group of each subject.
 }
 \examples{
 set.seed(1)

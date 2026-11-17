@@ -1,4 +1,4 @@
-# P-P plots dos residuos (Fine e Gelber, 2001, Secao 4)
+# P-P plots of the residuals (Fine and Gelber, 2001, Section 4)
 
 mk_pp_data <- function(n = 240, seed = 3) {
   set.seed(seed)
@@ -10,7 +10,7 @@ mk_pp_data <- function(n = 240, seed = 3) {
   d
 }
 
-test_that("FG: KM por grupo (beta) e formula do artigo com truncamento (theta)", {
+test_that("FG: KM per group (beta) and the article formula with trimming (theta)", {
   d <- mk_pp_data()
   L <- unname(quantile(d$t, .8))
   fit <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d, L = L)
@@ -30,24 +30,39 @@ test_that("FG: KM por grupo (beta) e formula do artigo com truncamento (theta)",
 
   trim <- log(L) - max(z %*% fit$beta)
   expect_equal(pp$trim, trim)
+  # H_{G_j}(X_j): censoring KM in the partition of the fit (default: no
+  # stratification, as in the application of the article)
+  H <- summary(survival::survfit(
+    survival::Surv(d$t, 1 - d$status) ~ 1), times = d$t)$surv
   paper <- function(s, x) {
     i <- d$sex == s
-    H <- numeric(nrow(d))
-    H[i] <- summary(survival::survfit(
-      survival::Surv(d$t[i], 1 - d$status[i]) ~ 1), times = d$t[i])$surv
     A <- d$status == 1 & e1 < trim & i
-    vapply(x, function(v) sum((1 / H)[A & e2 <= v]) / sum((1 / H)[A]), 0)
+    vapply(x, function(v) sum((1 / H)[A & e2 < v]) / sum((1 / H)[A]), 0)
   }
-  tt2 <- pp$theta[["1"]]$t[-1]
-  expect_equal(pp$theta[["1"]]$ref[-1], paper(0, tt2), tolerance = 1e-12)
-  expect_equal(pp$theta[["1"]]$group[-1], paper(1, tt2), tolerance = 1e-12)
+  tt2 <- pp$theta[["1"]]$t
+  expect_identical(tail(tt2, 1), Inf)
+  expect_equal(pp$theta[["1"]]$ref, paper(0, tt2), tolerance = 1e-12)
+  expect_equal(pp$theta[["1"]]$group, paper(1, tt2), tolerance = 1e-12)
+
+  # Stratified: H_G of the cens_group of the fit
+  fs <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d, L = L,
+                    cens_group = d$trt)
+  ps <- qast_pp(fs, d$sex)
+  Hs <- QAST:::km_weights_by_group(d$t, d$status, factor(d$trt))
+  e1s <- log(d$t) - drop(z %*% fs$beta)
+  e2s <- log(d$qt) - drop(z %*% fs$theta)
+  As <- d$status == 1 & e1s < ps$trim & d$sex == 1
+  x <- ps$theta[["1"]]$t
+  expect_equal(ps$theta[["1"]]$group,
+               vapply(x, function(v) sum((1 / Hs)[As & e2s < v]) /
+                        sum((1 / Hs)[As]), 0), tolerance = 1e-12)
   expect_equal(tail(pp$theta[["1"]]$ref, 1), 1)
   expect_equal(unname(pp$n_used),
                c(sum(d$status == 1 & e1 < trim & d$sex == 0),
                  sum(d$status == 1 & e1 < trim & d$sex == 1)))
 })
 
-test_that("proposto: sem truncamento e pesos de censura do ajuste (Cox)", {
+test_that("proposed: no trimming and the censoring weights of the fit (Cox)", {
   d <- mk_pp_data(seed = 8)
   fit <- semi_aft_prop(Qsurv(t, qt, status) ~ trt + age, data = d)
   grp <- cut(d$age, c(-Inf, 0, Inf), labels = c("young", "old"))
@@ -60,12 +75,12 @@ test_that("proposto: sem truncamento e pesos de censura do ajuste (Cox)", {
   e2 <- log(d$qt) - drop(z %*% fit$theta)
   H <- QAST:::HG(X = z, t = d$t, status = d$status)
   i <- grp == "young" & d$status == 1
-  tt <- pp$theta$young$t[-1]
-  ref <- vapply(tt, function(v) sum((1 / H)[i & e2 <= v]) / sum((1 / H)[i]), 0)
-  expect_equal(pp$theta$young$group[-1], ref, tolerance = 1e-12)
+  tt <- pp$theta$young$t
+  ref <- vapply(tt, function(v) sum((1 / H)[i & e2 < v]) / sum((1 / H)[i]), 0)
+  expect_equal(pp$theta$young$group, ref, tolerance = 1e-12)
 })
 
-test_that("varios grupos, print, plot e validacao", {
+test_that("several groups, print, plot and validation", {
   d <- mk_pp_data(seed = 5)
   fit <- semi_aft_prop(Qsurv(t, qt, status) ~ trt + age, data = d)
   g3 <- cut(d$age, quantile(d$age, 0:3 / 3), include.lowest = TRUE)

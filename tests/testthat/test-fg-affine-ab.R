@@ -1,10 +1,10 @@
-# Correcoes relativas a versao anterior:
-#   - mk_fg_case agora HONRA o argumento p (era ignorado; construia
-#     sempre 2 colunas — bug de harness que quebrou o fast path);
-#   - nomes de coluna genericos "z1..zp" (p != 2 nao tem "trt"/"sex");
-#   - fast path usa beta coerente com p=1;
-#   - gate de empate exato simplificado (sem a linha obscura com
-#     tie_safe <- TRUE da versao anterior).
+# Fixes relative to the previous version:
+#   - mk_fg_case now HONORS the argument p (it was ignored; it always
+#     built 2 columns — a harness bug that broke the fast path);
+#   - generic column names "z1..zp" (p != 2 has no "trt"/"sex");
+#   - the fast path uses a beta consistent with p = 1;
+#   - simplified exact-tie gate (without the obscure line with
+#     tie_safe <- TRUE of the previous version).
 # ----------------------------------------------------------------------------
 
 library(testthat)
@@ -12,20 +12,20 @@ library(testthat)
 mk_fg_case <- function(seed = 42, n = 60, p = 2, tie_at_L = FALSE) {
   stopifnot(is.integer(as.integer(p)), p >= 1)
   set.seed(seed)
-  # FIX B: p respeitado — p colunas binarias independentes
+  # FIX B: p honored — p independent binary columns
   z <- matrix(rbinom(n * p, 1, 0.45), nrow = n, ncol = p)
   colnames(z) <- paste0("z", seq_len(p))
   
-  # Coeficiente de sobrevivencia "real" so na primeira coluna (efeito
-  # em z1), para manter o caso identificavel mesmo com p > 2
+  # "True" survival coefficient only in the first column (effect on
+  # z1), to keep the case identifiable even with p > 2
   t      <- rexp(n, rate = exp(0.3 * z[, 1]))
   status <- rbinom(n, 1, 0.8)
   qt     <- pmin(t, t * runif(n, 0.4, 1))
   L      <- stats::quantile(t, 0.9)
   
   if (tie_at_L) {
-    # Empate exato: beta = 0 => z'beta = 0 exato;
-    # tempos duplicados exatamente em L; log() do mesmo double.
+    # Exact tie: beta = 0 => z'beta = 0 exactly;
+    # times duplicated exactly at L; log() of the same double.
     t[1:min(4, n)]        <- L
     status[1:min(4, n)]   <- 1L
   }
@@ -33,8 +33,8 @@ mk_fg_case <- function(seed = 42, n = 60, p = 2, tie_at_L = FALSE) {
        lt = log(t), lq = log(qt), hL = log(L))
 }
 
-# Grade de beta coerente com p arbitrario: primeiro elemento varia,
-# restantes zerados (para p=1 vira c(0), c(0.3), c(-0.5)).
+# Grid of beta consistent with an arbitrary p: the first element varies,
+# the others are zero (for p = 1 it becomes c(0), c(0.3), c(-0.5)).
 mk_fg_beta_grid <- function(p) {
   base <- rep(0, p)
   rbind(base,
@@ -53,7 +53,7 @@ fg_theta_grid <- function(p) {
 }
 
 
-test_that("Afim: equivale ao legado e a referencia R em grade de beta x theta", {
+test_that("Affine: equals the legacy kernel and the R reference on a grid of beta x theta", {
   skip_if_not(exists("U2_parts_fg_ref", envir = asNamespace("QAST")),
               "referencia R indisponivel")
   
@@ -80,7 +80,7 @@ test_that("Afim: equivale ao legado e a referencia R em grade de beta x theta", 
                                           km, "identity")
       expect_equal(parts_aff, parts_leg, tolerance = 1e-10)
       
-      # Triangulacao com a referencia R pura
+      # Triangulation with the pure R reference
       parts_ref <- QAST:::U2_parts_fg_ref(theta, cas$lt, cas$lq, cas$z,
                                           cas$status, beta, cas$hL,
                                           km, "identity")
@@ -97,7 +97,7 @@ test_that("Afim: equivale ao legado e a referencia R em grade de beta x theta", 
   }
 })
 
-test_that("Piecewise compilado: equivale ao legado em grade de beta x theta", {
+test_that("Compiled piecewise: equals the legacy kernel on a grid of beta x theta", {
   p <- 2
   beta_grid  <- mk_fg_beta_grid(p)
   theta_grid <- fg_theta_grid(p)
@@ -132,25 +132,25 @@ test_that("Piecewise compilado: equivale ao legado em grade de beta x theta", {
   }
 })
 
-test_that("Coluna constante: componente identicamente nula em todos os caminhos", {
-  # Coluna degenerada: Ra/Cb sao zeros alinhados a ka/kb; o
-  # make_fg_affine_cpp deve aceitar a coluna e a componente e
-  # identicamente 0.
+test_that("Constant column: identically null component in every path", {
+  # Degenerate column: Ra/Cb are zeros aligned with ka/kb;
+  # make_fg_affine_cpp must accept the column and the component is
+  # identically 0.
   cas <- mk_fg_case()
-  cas$z[, 2] <- 0L   # coluna 2 constante => grupo 1 vazio
+  cas$z[, 2] <- 0L   # constant column 2 => group 1 empty
   
   km <- QAST:::prep_km_by_column(cas$z, cas$t, cas$status)
   beta <- c(0.3, -0.2)
   
   pairs <- QAST:::make_fg_pairs_cpp(cas$lt, cas$lq, cas$z, cas$status,
                                     beta, cas$hL, km, "identity")
-  # Invariantes do schema na coluna degenerada
+  # Schema invariants in the degenerate column
   expect_length(pairs[[2]]$kb, 0L)
   expect_length(pairs[[2]]$Ra, length(pairs[[2]]$ka))
   expect_true(all(pairs[[2]]$Ra == 0))
   
-  aff <- QAST:::make_fg_affine_cpp(pairs, cas$lq, cas$z)   # nao deve dar erro
-  # O objeto identity nao guarda pares; o piecewise e construido a parte
+  aff <- QAST:::make_fg_affine_cpp(pairs, cas$lq, cas$z)   # must not fail
+  # The identity object stores no pairs; the piecewise one is built apart
   pairs_pw <- QAST:::make_fg_pairs_cpp(cas$lt, cas$lq, cas$z, cas$status,
                                        beta, cas$hL, km, "piecewise")
   pw  <- QAST:::compile_fg_pw_cpp(pairs_pw)
@@ -163,12 +163,12 @@ test_that("Coluna constante: componente identicamente nula em todos os caminhos"
                                           km, "identity")[2], 0.0)
 })
 
-test_that("Gate: empate exato em h1L preservado (afim)", {
-  # Empate exato: beta = 0 => z'beta = 0 exato; tempos
-  # duplicados exatamente em L; a desigualdade estrita do h1L replica
-  # bit a bit porque o congelamento acontece NA CONSTRUCAO dos pares.
-  # Falha por SALTO DISCRETO se qualquer reordenacao de floating point
-  # mover um par de lado do gate.
+test_that("Gate: exact tie in h1L preserved (affine)", {
+  # Exact tie: beta = 0 => z'beta = 0 exactly; times duplicated exactly
+  # at L; the strict inequality of h1L replicates bit for bit because
+  # the freezing happens AT THE CONSTRUCTION of the pairs. It fails by a
+  # DISCRETE JUMP if any floating-point reordering moves a pair across
+  # the gate.
   cas <- mk_fg_case(tie_at_L = TRUE)
   beta <- rep(0, ncol(cas$z))
   
@@ -185,15 +185,15 @@ test_that("Gate: empate exato em h1L preservado (afim)", {
   expect_equal(parts_aff, parts_leg, tolerance = 1e-10)
 })
 
-test_that("Fast path: minimos quadrados reproduzem o otimizador (L2/identity)", {
+test_that("Fast path: least squares reproduce the optimizer (L2/identity)", {
   skip_if_not_installed("minqa")
   
-  # FIX C: uobyqa com par inicial IGUAL A ZERO quebra no commonArgs do
-  # minqa: rhobeg default = min(0.95, 0.2*max(abs(par))) colapsa a 0
-  # => rhoend = 1e-6*rhobeg = 0 => stopifnot(0 < rhoend) falha.
-  # Defesas duplas:
-  #   (a) p = 2 — a documentacao do uobyqa pede length(par) > 1;
-  #   (b) start NAO-nulo + rhobeg explicito: imune a start nulo.
+  # FIX C: uobyqa with a starting par EQUAL TO ZERO breaks in minqa's
+  # commonArgs: the default rhobeg = min(0.95, 0.2*max(abs(par))) collapses to 0
+  # => rhoend = 1e-6*rhobeg = 0 => stopifnot(0 < rhoend) fails.
+  # Two defenses:
+  #   (a) p = 2 — the uobyqa documentation asks for length(par) > 1;
+  #   (b) NON-zero start + explicit rhobeg: immune to a zero start.
   cas <- mk_fg_case(seed = 777, n = 200, p = 2)
   km <- QAST:::prep_km_by_column(cas$z, cas$t, cas$status)
   beta <- c(0.3, -0.2)
@@ -209,10 +209,10 @@ test_that("Fast path: minimos quadrados reproduzem o otimizador (L2/identity)", 
   opt <- minqa::uobyqa(c(0.2, -0.1), obj_fun,
                        control = list(rhobeg = 0.5, rhoend = 1e-8))
   
-  # Nao-inferioridade: solucao fechada nao pode ser PIOR que o otimizador
+  # Non-inferiority: the closed-form solution cannot be WORSE than the optimizer
   expect_lte(obj_fun(sol$par), obj_fun(opt$par) + 1e-8)
   
-  # Gradiente ~ 0 no posto completo (semi_aft_fg exige < 1e-6)
+  # Gradient ~ 0 at full rank (semi_aft_fg requires < 1e-6)
   expect_lt(sol$grad_norm, 1e-6)
   expect_true(sol$full_rank)
 })

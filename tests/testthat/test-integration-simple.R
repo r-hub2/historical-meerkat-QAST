@@ -1,11 +1,11 @@
 # tests/testthat/test-integration-simple.R
 
-test_that("betahat e thetahat reproduzem valores de referencia do original (seed=42)", {
+test_that("betahat and thetahat reproduce reference values of the original (seed=42)", {
   skip_on_cran()
 
-  # Mesmo gerador de dados do original. O intercepto (coluna de 1) entra
-  # SO na geracao de t; o modelo nao estima intercepto (equacoes de
-  # posto, invariantes a deslocamento), entao ele sai de z no ajuste.
+  # Same data generator as the original. The intercept (column of 1s)
+  # enters ONLY in the generation of t; the model does not estimate an
+  # intercept (rank equations, invariant to shifts), so it leaves z in the fit.
   set.seed(42)
   n <- 300
   z_gen <- cbind(1, matrix(rnorm(n * 2), n, 2))
@@ -22,12 +22,12 @@ test_that("betahat e thetahat reproduzem valores de referencia do original (seed
                        M = 10, var_comp = FALSE,
                        var_method = "jackknife")
 
-  # Referencias do script original nos MESMOS dados (set.seed(42), n = 300),
-  # apenas as inclinacoes. O original otimizava tambem a direcao plana do
-  # intercepto (valor vindo de runif); sem ela, a trajetoria do
-  # Nelder-Mead sobre o objetivo escalonado muda e o ponto final se move
-  # ~2e-4 dentro do conjunto de minimos. Por isso: (1) inclinacoes em
-  # 1e-3 e (2) objetivo no ponto estimado nao pior que na referencia.
+  # References of the original script on the SAME data (set.seed(42), n = 300),
+  # slopes only. The original also optimized the flat direction of the
+  # intercept (value from runif); without it, the Nelder-Mead path over
+  # the step objective changes and the end point moves ~2e-4 within the
+  # set of minima. Hence: (1) slopes within 1e-3 and (2) objective at the
+  # estimated point not worse than at the reference.
   beta_ref  <- c(-0.320483557958109, 0.177030351648878)
   theta_ref <- c(-0.341859946407396, 0.182101852818395)
 
@@ -42,7 +42,7 @@ test_that("betahat e thetahat reproduzem valores de referencia do original (seed
   expect_lte(o2(unname(fit$theta)), o2(theta_ref) + 1e-12)
 })
 
-test_that("coluna constante (intercepto) em z e rejeitada nos dois modelos", {
+test_that("constant column (intercept) in z is rejected in both models", {
   set.seed(1)
   n <- 40
   zb <- cbind(trt = rbinom(n, 1, .5), sex = rbinom(n, 1, .4))
@@ -61,18 +61,18 @@ test_that("coluna constante (intercepto) em z e rejeitada nos dois modelos", {
                 var_method = "jackknife"),
     "const")
 
-  # Nomes das colunas ofensoras aparecem na mensagem
+  # Names of the offending columns appear in the message
   expect_error(QAST:::validate_no_constant_z(cbind(a = 1:3, b = 5)), "b")
   expect_silent(QAST:::validate_no_constant_z(zb))
 })
 
-test_that("colunas colineares geram warning (nao erro) nos dois modelos", {
+test_that("collinear columns give a warning (not an error) in both models", {
   set.seed(3)
   n <- 50
   zb <- cbind(trt = rbinom(n, 1, .5), sex = rbinom(n, 1, .4))
   t <- rexp(n); qt <- t * runif(n, .5, 1); st <- rbinom(n, 1, .8)
 
-  # duplicada (FG) e combinacao linear (proposto)
+  # duplicated (FG) and linear combination (proposed)
   z_dup <- cbind(zb, trt2 = zb[, "trt"])
   x1 <- rnorm(n); x2 <- rnorm(n)
   z_lin <- cbind(x1 = x1, x2 = x2, x3 = x1 + 2 * x2)
@@ -92,7 +92,7 @@ test_that("colunas colineares geram warning (nao erro) nos dois modelos", {
   expect_silent(QAST:::warn_collinear_z(zb))
 })
 
-test_that("z colinear: um unico aviso (sem repetir o do fast_path)", {
+test_that("collinear z: a single warning (without repeating the fast_path one)", {
   set.seed(3)
   n <- 50
   zb <- cbind(trt = rbinom(n, 1, .5), sex = rbinom(n, 1, .4))

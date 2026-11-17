@@ -46,10 +46,9 @@ U2_parts_fg_ref <- function(theta, lt, lq, z, status, beta, hL, km_surv,
     for (a in seq_along(e1k)) {
       for (b in seq_along(e1l)) {
         
-        # Emparelhamento posicional: a < b (indices dentro dos grupos)
-        if (a >= b) next
+        # All cross pairs (a in group 0, b in group 1)
         
-        # Eventos em ambos
+        # Events in both
         if (dk[a] == 0 || dl[b] == 0) next
         
         denom <- wk[a] * wl[b]

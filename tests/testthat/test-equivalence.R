@@ -1,10 +1,10 @@
 # tests/testthat/test-equivalence.R
 #
-# Golden reference: as funcoes U1_fun / U2_fun ORIGINAIS do script QAST,
-# copiadas sem modificacao (exceto tornar 'norm_min' parametro explicito,
-# que no original vinha do escopo envolvente via closure).
+# Golden reference: the ORIGINAL U1_fun / U2_fun functions of the QAST
+# script, copied without changes (except making 'norm_min' an explicit
+# parameter, which in the original came from the enclosing scope).
 
-# ---- Referencia: etapa beta ------------------------------------------------
+# ---- Reference: beta stage ------------------------------------------------
 
 Slfun_ref <- function(z, e1, l) {
   sapply(X = e1, u = e1, z = z, l = l,
@@ -24,7 +24,7 @@ U1_fun_ref <- function(par, t, z, status, h1, norm_min) {
   outU1
 }
 
-# ---- Referencia: etapa theta (ponderada por IPCW) --------------------------
+# ---- Reference: theta stage (IPCW weighted) -------------------------------
 
 Slfun_w_ref <- function(z, e2, l, status, HG_surv) {
   if (l == 0) {
@@ -52,7 +52,7 @@ U2_fun_ref <- function(par, qt, z, status, h2, HG_surv, norm_min) {
   outU2
 }
 
-# ---- Dados sinteticos compartilhados --------------------------------------
+# ---- Shared synthetic data -----------------------------------------------
 
 make_data <- function(n = 150, p = 3, seed = 20261021) {
   set.seed(seed)
@@ -64,9 +64,9 @@ make_data <- function(n = 150, p = 3, seed = 20261021) {
   list(z = z, t = t, qt = qt, status = rbinom(n, 1, 0.85))
 }
 
-# ---- Testes ---------------------------------------------------------------
+# ---- Tests ---------------------------------------------------------------
 
-test_that("U1_obj_cpp reproduz U1_fun original (L1 e L2, varios beta)", {
+test_that("U1_obj_cpp reproduces the original U1_fun (L1 and L2, several beta)", {
   d  <- make_data()
   h1 <- make.link("log")
   lt <- h1$linkfun(d$t)
@@ -84,13 +84,13 @@ test_that("U1_obj_cpp reproduz U1_fun original (L1 e L2, varios beta)", {
   }
 })
 
-test_that("U2_obj_cpp reproduz U2_fun original (ponderado, L1 e L2)", {
+test_that("U2_obj_cpp reproduces the original U2_fun (weighted, L1 and L2)", {
   d  <- make_data(seed = 999)
   h2 <- make.link("log")
   lq <- h2$linkfun(d$qt)
   
   set.seed(7)
-  HG_surv <- pmax(runif(nrow(d$z), 0.05, 1.5), 0.05)  # pesos IPCW positivos
+  HG_surv <- pmax(runif(nrow(d$z), 0.05, 1.5), 0.05)  # positive IPCW weights
   
   thetas <- list(rep(0, 3), c(0.3, -0.5, 0.8), c(1.1, 0.2, -0.7))
   
@@ -105,7 +105,7 @@ test_that("U2_obj_cpp reproduz U2_fun original (ponderado, L1 e L2)", {
   }
 })
 
-test_that("caso p = 1 nao quebra dimensoes", {
+test_that("case p = 1 does not break dimensions", {
   d  <- make_data(n = 80, p = 1, seed = 4242)
   h1 <- make.link("log"); h2 <- make.link("log")
   
@@ -121,7 +121,7 @@ test_that("caso p = 1 nao quebra dimensoes", {
   expect_equal(got2, ref2, tolerance = 1e-9)
 })
 
-test_that("casos degenerados (status todo zero, pesos nulos) retornam 0", {
+test_that("degenerate cases (all-zero status, null weights) return 0", {
   d  <- make_data(n = 60, seed = 31337)
   st0 <- rep(0, nrow(d$z))
   

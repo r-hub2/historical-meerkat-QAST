@@ -1,15 +1,15 @@
-# A ordenacao por radix sort de aft_core.cpp deve produzir EXATAMENTE a
-# permutacao de arma::stable_sort_index(e, "descend") e de order(-e):
-# decrescente, empates na ordem original dos indices. U1/U2 dependem
-# apenas dessa permutacao.
+# The radix sort of aft_core.cpp must produce EXACTLY the permutation
+# of arma::stable_sort_index(e, "descend") and of order(-e): decreasing,
+# ties in the original index order. U1/U2 depend only on that
+# permutation.
 
 test_that("radix sort == arma::stable_sort_index == order(-e)", {
   gens <- list(
     function(n) rnorm(n),
-    function(n) round(rnorm(n), 1),                            # empates
+    function(n) round(rnorm(n), 1),                            # ties
     function(n) sample(c(-1, -0, 0, 1, 2), n, TRUE),           # -0 / +0
     function(n) sample(c(rnorm(max(n, 4)), Inf, -Inf, 5e-324, -5e-324), n),
-    function(n) rep(3.5, n),                                   # tudo empatado
+    function(n) rep(3.5, n),                                   # all tied
     function(n) sample(c(.Machine$double.xmax, -.Machine$double.xmax,
                          1e-300, -1e-300, 0), n, TRUE),
     function(n) cumsum(rexp(n)),
@@ -23,6 +23,6 @@ test_that("radix sort == arma::stable_sort_index == order(-e)", {
   }
 })
 
-test_that("radix sort: NaN mantem o erro do Armadillo", {
+test_that("radix sort: NaN keeps Armadillo's error", {
   expect_error(QAST:::aft_order_desc_cpp(c(1, NaN, 2)), "NaN")
 })

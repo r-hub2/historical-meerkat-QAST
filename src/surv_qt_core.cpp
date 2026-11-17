@@ -1,18 +1,19 @@
 // src/surv_qt_core.cpp
 //
-// Estimador IPCW de Zhao e Tsiatis (1997) para a curva de sobrevivencia do
-// tempo ajustado por qualidade de vida (QALY). A documentacao vive no
+// IPCW estimator of Zhao and Tsiatis (1997) for the survival curve of
+// the quality-adjusted time (QALY). The documentation lives in the
 // wrapper R/surv_qt_wrappers.R.
 //
-// pred_surv[i] = (1/n) sum_{j : qalys[j] >= qalys[i]} status[j] / G(t_j),
-// calculado por uma ordenacao O(n log n) e uma soma acumulada O(n), com
-// empates agrupados. G e o KM da censura (survfit em R), avaliado em cada
-// tempo por busca binaria.
+// pred_surv[i] = (1/n) sum_{j : qalys[j] > qalys[i]} status[j] / G(t_j),
+// the survival P(Q > q) at the QALY of each observation, computed by an
+// O(n log n) sort and an O(n) cumulative sum, with ties grouped. G is
+// the censoring KM (survfit in R), evaluated at each time by binary
+// search.
 //
-// Convencoes:
-// - tempo alem do ultimo tempo do KM: G = NaN e o peso e tratado como 0;
-// - tempo antes do primeiro tempo do KM: G = 1;
-// - QALY <= 0 com preditor linear: erro (log indefinido).
+// Conventions:
+// - time beyond the last KM time: G = NaN and the weight is taken as 0;
+// - time before the first KM time: G = 1;
+// - QALY <= 0 with a linear predictor: error (log undefined).
 
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
@@ -24,10 +25,10 @@ using namespace Rcpp;
 
 namespace survqt_internal {
 
-// Avaliacao da step function KM em um tempo arbitrario.
-// Retorna: 1.0 antes do primeiro tempo de evento;
-//          NaN depois do ultimo tempo (o peso vira 0 em surv_qt_cpp);
-//          km_surv[k] com km_time[k] <= t < km_time[k+1], caso contrario.
+// Evaluation of the KM step function at an arbitrary time.
+// Returns: 1.0 before the first event time;
+//          NaN after the last time (the weight becomes 0 in surv_qt_cpp);
+//          km_surv[k] with km_time[k] <= t < km_time[k+1], otherwise.
 inline double km_eval(const double t,
                       const NumericVector& km_time,
                       const NumericVector& km_surv)
@@ -38,10 +39,10 @@ inline double km_eval(const double t,
   if (t < km_time[0]) return 1.0;
   if (t > km_time[m - 1]) return std::numeric_limits<double>::quiet_NaN();
   
-  // Busca binaria: maior k tal que km_time[k] <= t
+  // Binary search: largest k such that km_time[k] <= t
   int lo = 0, hi = m - 1;
   while (lo < hi) {
-    const int mid = (lo + hi + 1) / 2;  // arredonda para cima
+    const int mid = (lo + hi + 1) / 2;  // rounds up
     if (km_time[mid] <= t) {
       lo = mid;
     } else {
@@ -55,23 +56,23 @@ inline double km_eval(const double t,
 
 // surv_qt_cpp
 //
-// Nucleo do estimador de sobrevivencia para QALY:
+// Core of the survival estimator for QALY:
 //
-//   pred_surv[i] = (1/n) * sum_{j : qalys[j] >= qalys[i]} (status[j] / cens_surv[j])
+//   pred_surv[i] = (1/n) * sum_{j : qalys[j] > qalys[i]} (status[j] / cens_surv[j])
 //
-// Recebe cens_surv JA interpolado (use surv_qt_with_km_cpp para calcular
-// a interpolacao a partir dos vetores do survfit).
+// Takes cens_surv ALREADY interpolated (use surv_qt_with_km_cpp to
+// compute the interpolation from the survfit vectors).
 //
-// Argumentos:
-//   qaly       - vetor de tempos ajustados por qualidade (na escala crua)
-//   time       - tempos observados (usados apenas para validacao de tamanho)
-//   status     - indicador de evento (1 = evento, 0 = censura)
-//   cens_surv  - sobrevivencia da censura avaliada em cada observacao
-//   lin_pred   - opcional: predicao linear (X %*% theta); se fornecida,
+// Arguments:
+//   qaly       - vector of quality-adjusted times (on the raw scale)
+//   time       - observed times (used only to check the length)
+//   status     - event indicator (1 = event, 0 = censored)
+//   cens_surv  - censoring survival evaluated at each observation
+//   lin_pred   - optional: linear predictor (X %*% theta); if given,
 //                qalys = log(qaly) - lin_pred
 //
-// Retorna vetor numerico de comprimento n. Uso interno (chamado por
-// surv_qt_with_km_cpp); nao exportado para o R.
+// Returns a numeric vector of length n. Internal use (called by
+// surv_qt_with_km_cpp); not exported to R.
 NumericVector surv_qt_cpp(const NumericVector& qaly,
                           const NumericVector& time,
                           const NumericVector& status,
@@ -88,7 +89,7 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
     stop("cens_surv must have the same length as qaly");
   
   // -----------------------------------------------------------------------
-  // Transformacao: qalys = qaly (crus) ou log(qaly) - lin_pred
+  // Transformation: qalys = qaly (raw) or log(qaly) - lin_pred
   // -----------------------------------------------------------------------
   NumericVector qalys(n);
   
@@ -111,8 +112,8 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
   }
   
   // -----------------------------------------------------------------------
-  // Pesos: status / cens_surv
-  // NaN, zero ou nao finito em cens_surv -> peso 0
+  // Weights: status / cens_surv
+  // NaN, zero or non-finite in cens_surv -> weight 0
   // -----------------------------------------------------------------------
   NumericVector weight(n);
   for (int i = 0; i < n; ++i) {
@@ -125,11 +126,11 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
   }
   
   // -----------------------------------------------------------------------
-  // Estimador via ordenacao decrescente + sweep acumulado
+  // Estimator by a decreasing sort + cumulative sweep
   //
-  // Ordenar os indices por qalys decrescente faz com que, ao processar o
-  // elemento i, a soma acumulada contenha exatamente os pesos dos
-  // elementos com qalys >= qalys[i] (com ties agrupados).
+  // Sorting the indices by decreasing qalys makes the cumulative sum,
+  // when the tie group of qalys[i] is reached, hold exactly the weights
+  // of the elements with qalys > qalys[i].
   // -----------------------------------------------------------------------
   IntegerVector idx(n);
   for (int i = 0; i < n; ++i) idx[i] = i;
@@ -137,7 +138,7 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
   std::sort(idx.begin(), idx.end(),
             [&qalys](int a, int b) {
               if (qalys[a] != qalys[b]) return qalys[a] > qalys[b];
-              return a < b;  // desempate deterministico por indice
+              return a < b;  // deterministic tie-break by index
             });
   
   NumericVector pred_surv(n);
@@ -147,18 +148,15 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
   double acc = 0.0;
   while (j < n) {
     const double current = qalys[idx[j]];
-    
-    // Acumula todos os elementos do grupo de empate atual
+    const int start = j;
+
+    // Tie group: all get the sum of the strictly greater ones
+    // (comparison >), accumulated before adding the group itself
     while (j < n && qalys[idx[j]] == current) {
-      acc += weight[idx[j]];
+      pred_surv[idx[j]] = acc / dn;
       ++j;
     }
-    
-    // Todos os membros do grupo de empate recebem a mesma probabilidade
-    // (comparacao >=)
-    for (int k = j - 1; k >= 0 && qalys[idx[k]] == current; --k) {
-      pred_surv[idx[k]] = acc / dn;
-    }
+    for (int k = start; k < j; ++k) acc += weight[idx[k]];
   }
   
   return pred_surv;
@@ -166,19 +164,19 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
 
 // surv_qt_with_km_cpp
 //
-// Versao de conveniencia: interpola a step function KM (vetores
-// km_time/km_surv pre-computados via survfit em R) nos tempos
-// observados e delega ao nucleo surv_qt_cpp.
+// Convenience version: interpolates the KM step function (vectors
+// km_time/km_surv precomputed by survfit in R) at the observed times
+// and delegates to the core surv_qt_cpp.
 //
-// Argumentos:
-//   qaly      - vetor de tempos ajustados por qualidade (escala crua)
-//   time      - tempos observados
-//   status    - indicador de evento (1 = evento, 0 = censura)
-//   km_time   - tempos do survfit KM da censura (ordenados)
-//   km_surv   - sobrevivencias KM correspondentes
-//   lin_pred  - opcional: predicao linear (X %*% theta)
+// Arguments:
+//   qaly      - vector of quality-adjusted times (raw scale)
+//   time      - observed times
+//   status    - event indicator (1 = event, 0 = censored)
+//   km_time   - times of the censoring KM survfit (sorted)
+//   km_surv   - corresponding KM survival probabilities
+//   lin_pred  - optional: linear predictor (X %*% theta)
 //
-// Retorna vetor numerico de comprimento n.
+// Returns a numeric vector of length n.
 // [[Rcpp::export]]
 NumericVector surv_qt_with_km_cpp(const NumericVector& qaly,
                                   const NumericVector& time,
@@ -196,7 +194,7 @@ NumericVector surv_qt_with_km_cpp(const NumericVector& qaly,
   if (km_time.size() != km_surv.size())
     stop("km_time and km_surv must have the same length");
   
-  // Interpolacao do KM em cada tempo observado
+  // KM interpolation at each observed time
   NumericVector cens_surv(n);
   for (int i = 0; i < n; ++i) {
     cens_surv[i] = survqt_internal::km_eval(time[i], km_time, km_surv);

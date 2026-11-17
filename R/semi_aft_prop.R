@@ -80,13 +80,13 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
 
   # --- Formula --------------------------------------------------------------
   if (inherits(t, "formula")) {
-    names(cl)[names(cl) == "t"] <- ""   # Call: mostra a formula sem "t ="
+    names(cl)[names(cl) == "t"] <- ""   # Call: shows the formula without "t ="
     md <- .qast_model_data(t, data, parent.frame())
     t <- md$t; qt <- md$qt; status <- md$status; z <- md$z
     formula_info <- md$info
   }
 
-  # --- Validacao -------------------------------------------------------------
+  # --- Validation -----------------------------------------------------------
   method <- match.arg(method,
                       c("uobyqa", "mads", "Nelder-Mead", "subplex", "BB", "SANN",
                         "bobyqa", "newuoa", "hjkb", "BFGS"))
@@ -104,17 +104,17 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
   .validate_qast_data(t, qt, status, z, h1, h2)
   method <- .qast_method_for_p(method, ncol(z))
 
-  # --- Pre-computacao (constantes na otimizacao) ----------------------------
+  # --- Precomputation (constants in the optimization) ----------------------
   lt <- h1$linkfun(t)
   lq <- h2$linkfun(qt)
   n <- length(t)
   if (is.null(colnames(z))) colnames(z) <- paste0("x", seq_len(ncol(z)))
-  # O modelo nao estima intercepto: colunas constantes nao sao
-  # identificaveis (equacoes invariantes a deslocamento)
+  # The model does not estimate an intercept: constant columns are not
+  # identifiable (equations invariant to shifts)
   validate_no_constant_z(z)
-  warn_collinear_z(z)          # aviso, nao erro
-  # Em double uma vez: com inteiros o RcppArmadillo converteria z e status
-  # a cada avaliacao dos kernels.
+  warn_collinear_z(z)          # warning, not error
+  # As double once: with integers RcppArmadillo would convert z and status
+  # at every evaluation of the kernels.
   storage.mode(z) <- "double"
   status <- as.numeric(status)
 
@@ -137,7 +137,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     )
   }
 
-  # Codigo de convergencia: 0 = convergiu
+  # Convergence code: 0 = converged
   extract_conv <- function(res) {
     if (method == "uobyqa") return(res$ierr)
     cc <- res$convergence
@@ -145,7 +145,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     cc
   }
 
-  # Coeficientes iniciais via lm; NA (colinearidade) -> runif
+  # Starting coefficients by lm; NA (collinearity) -> runif
   init_coef <- function(y, zmat) {
     b <- tryCatch(lm(y ~ zmat)$coef[-1], error = function(e) rep(0, ncol(zmat)))
     if (anyNA(b)) b[is.na(b)] <- runif(sum(is.na(b)))
@@ -153,7 +153,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
   }
 
   # ---------------------------------------------------------------------------
-  # Etapa 1: Estimacao de Beta
+  # Stage 1: estimation of beta
   # ---------------------------------------------------------------------------
   U1min <- run_optimizer(init_coef(lt, z),
                          function(beta) U1_obj_cpp(beta, lt, z, status, norm_min))
@@ -162,9 +162,10 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
   betahat <- U1min$par
 
   # ---------------------------------------------------------------------------
-  # Variancia de Beta (var_comp = TRUE)
+  # Variance of beta (var_comp = TRUE)
   # ---------------------------------------------------------------------------
   vcov_beta <- NULL
+  replicates <- list(beta = NULL, theta = NULL)
   if (var_comp) {
 
     refit_beta <- function(t_sub, z_sub, status_sub) {
@@ -174,9 +175,9 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
                                            norm_min))$par
     }
 
-    # O jackknife de beta e feito junto com o de theta (abaixo): o refit
-    # de theta nao depende do de beta, entao as estimativas por replica
-    # sao as mesmas de passadas separadas.
+    # The jackknife of beta is done together with that of theta (below): the
+    # theta refit does not depend on the beta refit, so the estimates per
+    # replicate are the same as in separate passes.
 
     if (var_method == "bootstrap") {
       dat <- data.frame(t, status, z)
@@ -189,16 +190,17 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
                                           data[ind, 2])
                              })
       vcov_beta <- cov(boot_out$t)
+      replicates$beta <- .qast_boot_reps(boot_out)
     }
   }
 
   # ---------------------------------------------------------------------------
-  # Etapa 2: Estimacao de Theta
+  # Stage 2: estimation of theta
   # ---------------------------------------------------------------------------
   vcov_theta <- NULL
 
   if (!cens_weight) {
-    # Sem pesos IPCW, theta usa a equacao NAO ponderada (U1_obj_cpp) sobre lq
+    # Without IPCW weights, theta uses the UNweighted equation (U1_obj_cpp) on lq
     U2min <- run_optimizer(init_coef(lq, z),
                            function(theta) U1_obj_cpp(theta, lq, z, status,
                                                       norm_min))
@@ -207,7 +209,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     thetahat <- U2min$par
 
   } else {
-    # Pesos IPCW via Cox (survival::coxph)
+    # IPCW weights from a Cox model (survival::coxph)
     HG_surv <- HG(X = z, t = t, status = status)
 
     U2min <- run_optimizer(init_coef(lq, z),
@@ -218,7 +220,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     thetahat <- U2min$par
 
     # -------------------------------------------------------------------------
-    # Variancia de Theta (var_comp = TRUE, com recomputacao de HG)
+    # Variance of theta (var_comp = TRUE, recomputing HG)
     # -------------------------------------------------------------------------
     if (var_comp) {
 
@@ -231,7 +233,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
       }
 
       if (var_method == "jackknife") {
-        # beta e theta numa so passada (ver R/utils_jackknife.R)
+        # beta and theta in a single pass (see R/utils_jackknife.R)
         p <- ncol(z)
         jk <- .jackknife_se(
           n,
@@ -245,6 +247,8 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
         )
         vcov_beta  <- jk$beta$cov
         vcov_theta <- jk$theta$cov
+        replicates <- list(beta = .qast_jack_reps(jk$beta),
+                           theta = .qast_jack_reps(jk$theta))
       }
 
       if (var_method == "bootstrap") {
@@ -259,6 +263,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
                                              as.matrix(data[ind, -(1:3)]))
                                })
         vcov_theta <- cov(boot_out$t)
+        replicates$theta <- .qast_boot_reps(boot_out)
       }
     }
   }
@@ -269,6 +274,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
     vcov_beta = vcov_beta, vcov_theta = vcov_theta,
     var_comp = var_comp, var_method = var_method, M = M,
     lt = lt, lq = lq, t = t, qt = qt, formula_info = formula_info,
+    replicates = replicates,
     settings = list(h1 = h1_name, h2 = h2_name, method = method,
                     norm_min = norm_min, cens_weight = cens_weight)
   )

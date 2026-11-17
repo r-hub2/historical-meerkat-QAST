@@ -74,8 +74,12 @@ component, and stored in \code{intercept}, a named vector with elements
     (Zhao and Tsiatis, 2000), with the Kaplan-Meier censoring
     survival \eqn{\hat G}{G} evaluated at the survival time:
     \eqn{n^{-1}\sum_i \delta_i r_i / \hat G(T_i)}{(1/n) sum_i delta_i r_i / G(T_i)}.
-    This is the mean of the distribution estimated by
-    \code{\link{surv_qt_fun}}.
+    For \code{semi_aft_prop()} fits, \eqn{\hat G}{G} is the marginal
+    Kaplan-Meier, and this is the mean of the distribution estimated by
+    \code{\link{surv_qt_fun}}; for \code{semi_aft_fg()} fits, it is the
+    Kaplan-Meier within the censoring groups of the fit
+    (\code{cens_group}), the same weights as the estimating function
+    (the marginal one without stratification, the default).
 }
 The linear predictor of the transformed time is then
 \code{intercept["beta"] + z \%*\% beta} (and likewise with

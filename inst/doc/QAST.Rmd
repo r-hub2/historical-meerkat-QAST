@@ -90,6 +90,19 @@ On the log scale (`h1 = h2 = "log"`, the defaults), `exp(coef)` is a **time
 ratio**: values above 1 mean longer times. Here the treatment lengthens
 both the survival time and the quality-adjusted survival time.
 
+The model assumes that the censoring depends on the covariates only through
+a discrete partition chosen by the analyst, and weights each subject by the
+Kaplan-Meier censoring survival of its group. As in the application of Fine
+and Gelber (2001), the default does not stratify. If the censoring depends
+on a covariate (which a Cox model of the censoring can show, as in the
+article), `cens_group` stratifies by it:
+
+```{r fg-cens}
+fit_fg1 <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
+                       L = quantile(d$t, 0.9), cens_group = d$trt)
+coef(fit_fg1)
+```
+
 ## Proposed model
 
 `semi_aft_prop()` accepts continuous covariates:

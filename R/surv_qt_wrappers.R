@@ -6,10 +6,14 @@
 #' inverse of the censoring survival at its survival time, which corrects
 #' the induced informative censoring on the quality-adjusted scale:
 #'
-#'   \code{pred_surv[i] = (1/n) * sum_\{j : qalys[j] >= qalys[i]\} status[j] / G(t_j)}
+#'   \code{pred_surv[i] = (1/n) * sum_\{j : qalys[j] > qalys[i]\} status[j] / G(t_j)}
 #'
 #' where G is the Kaplan-Meier survival of the censoring distribution and
 #' \code{qalys = log(qaly) - lin_pred} when a linear predictor is given.
+#' \code{pred_surv[i]} is the survival \eqn{P(Q > q_i)}{P(Q > q_i)} at the
+#' quality-adjusted time of each subject (right-continuous steps, the same
+#' convention as \code{predict(type = "survival")} and the Kaplan-Meier
+#' curve).
 #'
 #' @param qaly Quality-adjusted survival times (QALY), on the raw
 #'   (positive) scale
@@ -43,7 +47,7 @@
 #' @export
 surv_qt_fun <- function(qaly, time, status, lin_pred = NULL, km_fit = NULL) {
   
-  # --- Validacoes -----------------------------------------------------------
+  # --- Checks ---------------------------------------------------------------
   n <- length(qaly)
   if (length(time) != n) {
     stop("time must have the same length as qaly")
@@ -59,14 +63,14 @@ surv_qt_fun <- function(qaly, time, status, lin_pred = NULL, km_fit = NULL) {
          "(log undefined)")
   }
   
-  # --- Sobrevivencia da censura (Kaplan-Meier) -------------------------------
-  # survfit em R; o kernel C++ avalia a step function por busca binaria
+  # --- Censoring survival (Kaplan-Meier) ------------------------------------
+  # survfit in R; the C++ kernel evaluates the step function by binary search
   if (is.null(km_fit)) {
     km_fit <- survival::survfit(survival::Surv(time, 1 - status) ~ 1)
   }
   
-  # --- Chamada ao kernel C++ -------------------------------------------------
-  # A transformacao log(qaly) - lin_pred acontece dentro do kernel.
+  # --- Call to the C++ kernel -----------------------------------------------
+  # The transformation log(qaly) - lin_pred happens inside the kernel.
   surv_qt_with_km_cpp(
     qaly     = qaly,
     time     = time,

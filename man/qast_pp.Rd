@@ -57,21 +57,24 @@ theta'Z_j}, for each group \eqn{s}:
     among the events of the group, normalized by the total weight of
     the group:
     \deqn{\hat F_s(t) = \frac{\sum_j \Delta_j \hat H(X_j)^{-1}
-      I\{A_j, Z_j \in S_s, \hat\epsilon_{2j} \le t\}}{\sum_j \Delta_j
+      I\{A_j, Z_j \in S_s, \hat\epsilon_{2j} < t\}}{\sum_j \Delta_j
       \hat H(X_j)^{-1} I\{A_j, Z_j \in S_s\}}.}{F_s(t) = sum_j
-      Delta_j / H(X_j) I(A_j, j in group s, e2_j <= t) / sum_j
+      Delta_j / H(X_j) I(A_j, j in group s, e2_j < t) / sum_j
       Delta_j / H(X_j) I(A_j, j in group s).}
     For \code{semi_aft_fg()} fits, as in Fine and Gelber (2001),
     \eqn{A_j}{A_j} is the trimming
     \eqn{\hat\epsilon_{1j} < h_1(L) - \max_k \hat\beta^\top Z_k}{e1_j <
     h1(L) - max_k beta'Z_k}, so \eqn{\hat F_s}{F_s} estimates the
     conditional distribution
-    \eqn{\Pr\{\epsilon_2 \le t \mid \epsilon_1 < h_1(L) -
-    \max_Z(\beta^\top Z)\}}{Pr(e2 <= t | e1 < h1(L) - max beta'Z)}
+    \eqn{\Pr\{\epsilon_2 < t \mid \epsilon_1 < h_1(L) -
+    \max_Z(\beta^\top Z)\}}{Pr(e2 < t | e1 < h1(L) - max beta'Z)}
     required by the estimating function of \eqn{\theta}{theta}, and
-    \eqn{\hat H}{H} is the Kaplan-Meier censoring survival within the
-    group. For \code{semi_aft_prop()} fits, which have no truncation
-    time, there is no trimming (\eqn{A_j}{A_j} always holds) and
+    \eqn{\hat H = \hat H_{G_j}(X_j)}{H = H_G(X_j)} is the Kaplan-Meier
+    censoring survival in the censoring group of the fit
+    (\code{cens_group} of \code{\link{semi_aft_fg}}; the marginal
+    Kaplan-Meier without stratification, the default). For
+    \code{semi_aft_prop()} fits, which have no truncation time, there
+    is no trimming (\eqn{A_j}{A_j} always holds) and
     \eqn{\hat H}{H} are the censoring weights of the fit: the Cox model
     of the censoring given the covariates when \code{cens_weight = TRUE},
     the Kaplan-Meier within the group otherwise.
@@ -81,7 +84,10 @@ time first: the quality-adjusted diagnostic assumes it is correct.
 Each group is compared with the reference group \code{ref} on a common
 grid of residual values (the event residuals of the two groups; for
 \code{beta}, up to the smallest of the two largest residuals, beyond
-which a Kaplan-Meier curve is undefined). Continuous covariates must be
+which a Kaplan-Meier curve is undefined). As in the article, the
+quality-adjusted distribution uses the strict indicator
+\eqn{\hat\epsilon_{2j} < t}{e2_j < t}, so at each grid value it is the
+left limit; the last point of the grid closes the curve at (1, 1). Continuous covariates must be
 discretized to form the groups (e.g. with \code{cut()}).
 }
 \examples{

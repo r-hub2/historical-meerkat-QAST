@@ -28,7 +28,7 @@ km_weights_at <- function(t, status, use_legacy = FALSE) {
   n <- length(t)
   if (n == 0L) return(numeric(0))
   
-  # Grupo sem eventos: pesos 1
+  # Group without events: weights 1
   if (sum(status) == 0L) return(rep(1, n))
   
   fit <- survival::survfit(survival::Surv(t, 1 - status) ~ 1)
@@ -36,11 +36,11 @@ km_weights_at <- function(t, status, use_legacy = FALSE) {
     return(rep(1, n))
   }
   
-  # findInterval(x, v) = numero de elementos de v que sao <= x
+  # findInterval(x, v) = number of elements of v that are <= x
   # (left.open = FALSE, rightmost.closed = FALSE) == max(which(v <= x))
   idx <- findInterval(t, fit$time)
   
-  # idx == 0 (antes do primeiro salto): S = 1. Nos demais: surv[idx].
+  # idx == 0 (before the first jump): S = 1. Otherwise: surv[idx].
   w <- fit$surv[pmax(idx, 1L)]
   w[idx == 0L] <- 1
   w
@@ -54,7 +54,7 @@ km_weights_at <- function(t, status, use_legacy = FALSE) {
   n <- length(t)
   if (n == 0L) return(numeric(0))
   
-  # Grupo sem eventos: pesos 1
+  # Group without events: weights 1
   if (sum(status) == 0L) return(rep(1, n))
   
   fit <- survival::survfit(survival::Surv(t, 1 - status) ~ 1)
@@ -75,68 +75,66 @@ km_weights_at <- function(t, status, use_legacy = FALSE) {
   }, numeric(1))
 }
 
-#' KM weights for each binary covariate column
+#' Censoring partition of the Fine and Gelber model
 #'
-#' For each column j of z, the censoring KM weights in the groups
-#' \code{z[, j] == 0} (w0) and \code{z[, j] == 1} (w1). Identical columns
-#' define the same groups and therefore the same weights: with
-#' \code{dedupe_cols = TRUE}, survfit runs once per distinct column.
+#' Fine and Gelber (2001) assume that the censoring depends on a discrete
+#' partition G of the covariates, chosen by the analyst. As in their
+#' application, the default is no stratification (a single group);
+#' \code{group} sets another partition.
+#'
+#' @param z Binary covariate matrix (n x p)
+#' @param group NULL (a single group) or a vector of length n
+#' @return Factor of length n
+#' @keywords internal
+fg_cens_partition <- function(z, group = NULL) {
+  if (is.null(group)) return(factor(rep("all", nrow(z))))
+  factor(group)
+}
+
+#' Censoring KM survival of each subject in its censoring group
+#'
+#' \eqn{\hat H_{G_i}(X_i)}{H_G(X_i)}: the censoring Kaplan-Meier curve of
+#' the group of subject i, evaluated at its observed time.
+#'
+#' @param t Observed times
+#' @param status Event indicator
+#' @param group Factor with the censoring groups
+#' @param use_legacy Passed to km_weights_at (reference for the tests)
+#' @return Numeric vector of length n
+#' @keywords internal
+km_weights_by_group <- function(t, status, group, use_legacy = FALSE) {
+  H <- numeric(length(t))
+  for (g in levels(group)) {
+    i <- which(group == g)
+    if (length(i)) H[i] <- km_weights_at(t[i], status[i],
+                                         use_legacy = use_legacy)
+  }
+  H
+}
+
+#' Censoring weights of the Fine and Gelber pairs, by column
+#'
+#' Each subject has one censoring weight \eqn{\hat H_{G_i}(X_i)}{H_G(X_i)}
+#' from the censoring partition (Fine and Gelber, 2001), the same in every
+#' component of the estimating function. The kernels read it split by the
+#' groups of each binary column: \code{w0} (rows with \code{z[, j] == 0})
+#' and \code{w1} (rows with \code{z[, j] == 1}), in the original order.
 #' Recomputed in every variance replicate.
 #'
 #' @param z Binary covariate matrix (n x p)
 #' @param t Observed times
 #' @param status Event indicator
 #' @param use_legacy Passed to km_weights_at (reference for the tests)
-#' @param dedupe_cols If TRUE (default), computes the weights once per
-#'   distinct column (safe by construction: identical columns give
-#'   identical groups and weights)
+#' @param group Censoring partition: NULL (default; a single group, no
+#'   stratification) or a vector of length n
 #' @return List of length p; element j holds w0 and w1
 #' @keywords internal
 prep_km_by_column <- function(z, t, status, use_legacy = FALSE,
-                              dedupe_cols = TRUE) {
-  p <- ncol(z)
-  
-  if (!dedupe_cols || p == 1L) {
-    out <- lapply(seq_len(p), function(j) {
-      x <- z[, j]
-      list(
-        w0 = km_weights_at(t[x == 0], status[x == 0],
-                           use_legacy = use_legacy),
-        w1 = km_weights_at(t[x == 1], status[x == 1],
+                              group = NULL) {
+  H <- km_weights_by_group(t, status, fg_cens_partition(z, group),
                            use_legacy = use_legacy)
-      )
-    })
-    return(out)
-  }
-  
-  # key[j] = indice da PRIMEIRA coluna identica a coluna j (j se unica).
-  # Impressao digital numerica (soma ponderada com pesos fixos, sem RNG)
-  # para achar candidatas em O(n*p); a igualdade e CONFIRMADA com
-  # identical(), entao colisoes de impressao digital nunca fundem colunas
-  # diferentes.
-  fp <- as.vector(crossprod(z, sqrt(seq_len(nrow(z)) + 1)))
-  key <- seq_len(p)
-  for (j in seq_len(p)[-1L]) {
-    cand <- which(fp[seq_len(j - 1L)] == fp[j])
-    for (k in cand) {
-      if (identical(z[, k], z[, j])) { key[j] <- key[k]; break }
-    }
-  }
-  
-  uniq <- sort(unique(key))
-  
-  # Ajusta cada grupo-distinto UMA vez
-  cache <- lapply(uniq, function(k) {
-    x <- z[, k]
-    list(
-      w0 = km_weights_at(t[x == 0], status[x == 0],
-                         use_legacy = use_legacy),
-      w1 = km_weights_at(t[x == 1], status[x == 1],
-                         use_legacy = use_legacy)
-    )
+  lapply(seq_len(ncol(z)), function(j) {
+    x <- z[, j]
+    list(w0 = H[x == 0], w1 = H[x == 1])
   })
-  names(cache) <- as.character(uniq)
-  
-  # Replica a saida para todas as colunas com a mesma chave
-  lapply(key, function(k) cache[[as.character(k)]])
 }
