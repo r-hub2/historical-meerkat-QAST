@@ -187,7 +187,10 @@ plot(pp)
 
 Standard errors come from the delete-1 jackknife (`var_method =
 "jackknife"`, the default) or the bootstrap (`var_method = "bootstrap"`,
-with `M` replicates). The replicates run in parallel on the physical cores;
+with `M` resamples of the subjects). Each replicate refits the whole
+estimator, beta, the censoring weights and theta, on the same subsample or
+resample; replicates in which a covariate loses rank are discarded, with a
+warning. The replicates run in parallel on the physical cores;
 `options(QAST.cores = k)` sets the number of processes.
 
 ## Survival curve of the quality-adjusted time

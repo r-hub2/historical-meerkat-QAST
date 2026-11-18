@@ -75,3 +75,14 @@ First release.
   pair marginals of the U-statistic are computed in O(N log^2 N).
 * Jackknife and bootstrap variances run in parallel (fork) on the physical
   cores; set `options(QAST.cores = k)` to change the number of processes.
+* Each jackknife or bootstrap replicate refits the whole estimator on the
+  same subsample or resample: beta, the censoring weights and theta, with
+  the beta of the replicate in the theta equation of `semi_aft_fg()` (which
+  depends on beta through the trimming at `L`). Keeping the full-sample
+  beta, as the code used in the thesis did, underestimates the standard
+  errors of theta. The bootstrap draws one set of resamples for both
+  components, as `boot::boot()`, which is no longer a dependency.
+* Replicates whose covariates lose rank in the resample (e.g. a rare binary
+  covariate that disappears) or whose optimizer does not converge are
+  discarded, with a warning that counts them; warnings of the replicates
+  are reported once per distinct message.

@@ -14,6 +14,7 @@ Implements bivariate semi-parametric accelerated failure time models for the joi
 Useful links:
 \itemize{
   \item \url{https://codeberg.org/landsilva/QAST}
+  \item \url{https://landsilva.codeberg.page/QAST/}
   \item Report bugs at \url{https://codeberg.org/landsilva/QAST/issues}
 }
 

@@ -450,9 +450,9 @@ statistics and p-values for both components:</p>
 <span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; Intercept (Kaplan-Meier mean of the residuals): -0.664</span></span>
 <span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; --------------------------------------------------------------</span></span>
 <span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt; Quality-adjusted survival time component</span></span>
-<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt;       coef exp(coef) se(coef)     z Pr(&gt;|z|)    </span></span>
-<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; trt 1.0255    2.7886   0.2616 3.920 8.84e-05 ***</span></span>
-<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; sex 0.0506    1.0519   0.2629 0.192    0.847    </span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt;       coef exp(coef) se(coef)     z Pr(&gt;|z|)   </span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt; trt 1.0255    2.7886   0.3534 2.902  0.00371 **</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt; sex 0.0506    1.0519   0.2636 0.192  0.84779   </span></span>
 <span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; Intercept (IPCW mean of the residuals): -1.273</span></span>
 <span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt; ---</span></span>
 <span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt; Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</span></span></code></pre></div>
@@ -576,8 +576,11 @@ discretized to form the groups:</p>
 <h2>Variance</h2>
 <p>Standard errors come from the delete-1 jackknife
 (<code>var_method = &quot;jackknife&quot;</code>, the default) or the bootstrap
-(<code>var_method = &quot;bootstrap&quot;</code>, with <code>M</code> replicates).
-The replicates run in parallel on the physical cores;
+(<code>var_method = &quot;bootstrap&quot;</code>, with <code>M</code> resamples of
+the subjects). Each replicate refits the whole estimator, beta, the
+censoring weights and theta, on the same subsample or resample;
+replicates in which a covariate loses rank are discarded, with a
+warning. The replicates run in parallel on the physical cores;
 <code>options(QAST.cores = k)</code> sets the number of processes.</p>
 </div>
 <div id="survival-curve-of-the-quality-adjusted-time" class="section level2">

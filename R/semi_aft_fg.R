@@ -32,7 +32,14 @@
 #' @param M Number of bootstrap replicates; required only with
 #'   \code{var_method = "bootstrap"}
 #' @param var_comp If TRUE, estimates the variances (default FALSE)
-#' @param var_method \code{"jackknife"} (default) or \code{"bootstrap"}
+#' @param var_method \code{"jackknife"} (default, delete-1) or
+#'   \code{"bootstrap"} (resampling of subjects). Each replicate
+#'   re-estimates beta, the Kaplan-Meier censoring weights and theta (with the beta of
+#'   the replicate, since the theta equation depends on beta) on the same subsample or
+#'   resample, which also gives the joint covariance of the replicates.
+#'   Replicates whose covariates lose rank (e.g. a binary covariate
+#'   that became constant) or whose optimizer does not converge are
+#'   discarded, with a warning.
 #' @param fast_path If TRUE (default) and \code{phi = "identity"},
 #'   \code{norm_min = "L2"}, theta is estimated in closed form: least
 #'   squares on the affine representation, which is the EXACT minimum of the
@@ -199,41 +206,6 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   betahat <- U1min$par
   
   # ---------------------------------------------------------------------------
-  # Variance of beta (var_comp = TRUE)
-  # ---------------------------------------------------------------------------
-  vcov_beta <- NULL
-  replicates <- list(beta = NULL, theta = NULL)
-  if (var_comp) {
-    
-    refit_beta <- function(t_sub, z_sub, status_sub) {
-      lt_sub <- h1$linkfun(t_sub)
-      run_optimizer(betahat,
-                    function(b) U1_obj_cpp(b, lt_sub, z_sub,
-                                           status_sub, norm_min))$par
-    }
-    
-    # The jackknife of beta is done together with that of theta (below): the
-    # theta refit uses the betahat of the full sample, so the estimates per
-    # replicate are the same as in separate passes.
-
-    if (var_method == "bootstrap") {
-      dat <- data.frame(t, status, z)
-      boot_out <- boot::boot(
-        data = dat, R = M,
-        parallel = "multicore",
-        ncpus = .qast_workers(),
-        statistic = function(data, ind) {
-          refit_beta(data[ind, 1],
-                     as.matrix(data[ind, -(1:2)]),
-                     data[ind, 2])
-        }
-      )
-      vcov_beta <- cov(boot_out$t)
-      replicates$beta <- .qast_boot_reps(boot_out)
-    }
-  }
-  
-  # ---------------------------------------------------------------------------
   # Stage 2: estimation of theta
   #
   #   stage2_env(): builds the objective of a (sub)sample
@@ -243,10 +215,10 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   # ---------------------------------------------------------------------------
   km_surv <- prep_km_by_column(z, t, status, group = cgroup)
   
-  stage2_env <- function(lt_s, lq_s, z_s, status_s, km_s) {
+  stage2_env <- function(lt_s, lq_s, z_s, status_s, km_s, beta = betahat) {
     if (phi == "identity") {
       pairs <- make_fg_pairs(lt_s, lq_s, z_s, status_s,
-                             betahat, hL, km_s, phi)
+                             beta, hL, km_s, phi)
       aff <- make_fg_affine(pairs, lq_s, z_s)
       list(
         fn = function(th) eval_fg_obj_affine(aff, th, norm_min),
@@ -257,13 +229,13 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
       # Without explicit pairs: active members and a divide-and-conquer
       # sum, O(n) memory and O(n log^2 n) per evaluation. Weights outside
       # the safe range (see fg_pairs_core.cpp): explicit pairs.
-      lean <- make_fg_pw_lean_cpp(lt_s, lq_s, z_s, status_s, betahat, hL,
+      lean <- make_fg_pw_lean_cpp(lt_s, lq_s, z_s, status_s, beta, hL,
                                   km_s)
       fn <- if (isTRUE(attr(lean, "meta")$ok)) {
         function(th) eval_fg_obj_pw_lean_cpp(lean, lq_s, z_s, th, norm_min)
       } else {
         pairs <- make_fg_pairs(lt_s, lq_s, z_s, status_s,
-                               betahat, hL, km_s, phi)
+                               beta, hL, km_s, phi)
         function(th) eval_fg_obj(pairs, lq_s, z_s, th, "piecewise", norm_min)
       }
       list(fn = fn, affine = NULL, can_fast = FALSE)
@@ -272,7 +244,7 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
   
   # Closed form when possible; rank deficiency or a large residual
   # gradient -> warning and the optimizer on the same affine objective.
-  solve_theta <- function(s2, par0) {
+  solve_theta <- function(s2, par0, must_converge = TRUE, replicate = FALSE) {
     if (fast_path && s2$can_fast && norm_min == "L2") {
       rcond <- 1e-10
       sol <- solve_fg_theta_affine(s2$affine, rcond = rcond)
@@ -283,7 +255,13 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
       # If the whole z was already flagged as collinear, this warning repeats
       # the same cause; it is issued only when the rank loss is new (e.g. a
       # degenerate jackknife/bootstrap replicate).
-      if (z_full_rank) warning(
+      # In the variance replicates, a generic message (without the numbers
+      # of each replicate) so that it is reported once
+      if (replicate) {
+        if (z_full_rank) warning("fast_path: rank-deficient system or large residual ",
+                "gradient in variance replicates; theta solved there by ",
+                "the optimizer on the same affine objective")
+      } else if (z_full_rank) warning(
         "fast_path: rank-deficient system or large residual gradient ",
         sprintf("(rcond = %.2g, full_rank = %s, grad_norm = %.2g). ",
                 rcond, isTRUE(sol$full_rank), sol$grad_norm),
@@ -292,67 +270,64 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
       )
     }
     U2min <- run_optimizer(par0, s2$fn)
-    stopifnot("The theta estimation algorithm did not converge" =
-                extract_conv(U2min) == 0)
-    list(par = U2min$par, converged = TRUE)
+    converged <- extract_conv(U2min) == 0
+    if (must_converge)
+      stopifnot("The theta estimation algorithm did not converge" = converged)
+    list(par = U2min$par, converged = converged)
   }
   
   stage2 <- stage2_env(lt, lq, z, status, km_surv)
   thetahat <- solve_theta(stage2, init_coef(lq, z))$par
   
   # ---------------------------------------------------------------------------
-  # Variance of theta (var_comp = TRUE)
+  # Variance (var_comp = TRUE)
   #
-  # Per replicate: KM weights, pairs and objective rebuilt on the subsample
-  # and solved by the same path as the point estimate.
+  # Each replicate re-estimates the whole estimator on the same subsample
+  # (jackknife) or resample (bootstrap): beta, then the KM censoring
+  # weights, the pairs and theta with the beta of the replicate (the
+  # theta equation depends on beta through the trimming at h1(L) and the
+  # residuals of the survival time). A replicate whose covariates lose
+  # rank, or whose optimizer does not converge, gives NA and is discarded
+  # (with a warning).
   # ---------------------------------------------------------------------------
-  vcov_theta <- NULL
+  vcov_beta <- vcov_theta <- NULL
+  replicates <- list(beta = NULL, theta = NULL)
   if (var_comp) {
-    
-    refit_theta <- function(t_sub, qt_sub, status_sub, z_sub, g_sub) {
-      lq_sub <- h2$linkfun(qt_sub)
-      lt_sub <- h1$linkfun(t_sub)
-      km_surv_sub <- prep_km_by_column(z_sub, t_sub, status_sub,
-                                       group = droplevels(g_sub))
-      s2 <- stage2_env(lt_sub, lq_sub, z_sub, status_sub, km_surv_sub)
-      solve_theta(s2, thetahat)$par
-    }
-    
-    if (var_method == "jackknife") {
-      # beta and theta in a single pass (see R/utils_jackknife.R)
-      p <- ncol(z)
-      jk <- .jackknife_se(
-        n,
-        refit = function(i) {
-          z_i <- z[-i, , drop = FALSE]
-          c(refit_beta(t[-i], z_i, status[-i]),
-            refit_theta(t[-i], qt[-i], status[-i], z_i, cgroup[-i]))
-        },
-        blocks = list(beta = seq_len(p), theta = p + seq_len(p)),
-        cov = TRUE
-      )
-      vcov_beta  <- jk$beta$cov
-      vcov_theta <- jk$theta$cov
-      replicates <- list(beta = .qast_jack_reps(jk$beta),
-                         theta = .qast_jack_reps(jk$theta))
-    }
+    p <- ncol(z)
+    rank_z <- qr(z)$rank
+    na_p <- rep(NA_real_, p)
 
-    if (var_method == "bootstrap") {
-      dat <- data.frame(t, qt, status, z)
-      boot_out <- boot::boot(
-        data = dat, R = M,
-        parallel = "multicore",
-        ncpus = .qast_workers(),
-        statistic = function(data, ind) {
-          refit_theta(data[ind, 1], data[ind, 2], data[ind, 3],
-                      as.matrix(data[ind, -(1:3)]), cgroup[ind])
-        }
-      )
-      vcov_theta <- cov(boot_out$t)
-      replicates$theta <- .qast_boot_reps(boot_out)
+    refit <- function(rows) {
+      z_s <- z[rows, , drop = FALSE]
+      if (.qast_rank_deficient(z_s, rank_z)) return(c(na_p, na_p))
+      t_s <- t[rows]; status_s <- status[rows]
+      lt_s <- lt[rows]; lq_s <- lq[rows]
+      rb <- run_optimizer(betahat, function(b)
+        U1_obj_cpp(b, lt_s, z_s, status_s, norm_min))
+      if (extract_conv(rb) != 0) return(c(na_p, na_p))
+      km_s <- prep_km_by_column(z_s, t_s, status_s,
+                                group = droplevels(cgroup[rows]))
+      s2 <- stage2_env(lt_s, lq_s, z_s, status_s, km_s, beta = rb$par)
+      sol <- solve_theta(s2, thetahat, must_converge = FALSE,
+                         replicate = TRUE)
+      c(rb$par, if (sol$converged) sol$par else na_p)
     }
+    blocks <- list(beta = seq_len(p), theta = p + seq_len(p))
+
+    if (var_method == "jackknife") {
+      vr <- .jackknife_se(n, refit = function(i) refit(-i), blocks = blocks,
+                          cov = TRUE)
+      .qast_warn_discarded(vr, n, "jackknife")
+      replicates <- lapply(vr, .qast_jack_reps)
+    } else {
+      vr <- .qast_bootstrap(n, M, refit, blocks)
+      .qast_warn_discarded(vr, M, "bootstrap")
+      replicates <- lapply(vr, .qast_boot_reps)
+    }
+    vcov_beta  <- vr$beta$cov
+    vcov_theta <- vr$theta$cov
   }
-  
+
   .new_qast_fit(
     model = "fg", call = cl, z = z, status = status,
     betahat = betahat, thetahat = thetahat,

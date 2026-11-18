@@ -10,22 +10,24 @@
 \item{n}{Number of observations}
 
 \item{refit}{Function of i (the removed index) returning the vector of
-estimates on the sample without observation i}
+estimates on the sample without observation i (NA for a degenerate
+replicate, which is discarded)}
 
 \item{blocks}{Named list of column indices of the vector returned by
 refit (e.g. \code{list(beta = 1:p, theta = p + 1:p)})}
 
 \item{cores}{Number of workers (fork)}
 
-\item{cov}{If TRUE, returns \code{list(se, cov, reps, drop)} per block,
-with the jackknife covariance matrix
+\item{cov}{If TRUE, returns \code{list(se, cov, reps, drop, n_drop)} per
+block, with the jackknife covariance matrix
 \code{(n - 1) / n_valid * crossprod(jk - theta_dot)} (whose diagonal is
-\code{se^2}), the valid replicates (rows of \code{reps}) and the
-observation removed in each of them (\code{drop})}
+\code{se^2}), the valid replicates (rows of \code{reps}), the
+observation removed in each of them (\code{drop}) and the number of
+discarded replicates (\code{n_drop})}
 }
 \value{
 Named list (as blocks) of standard-error vectors, or of
-  \code{list(se, cov, reps, drop)} when \code{cov = TRUE}
+  \code{list(se, cov, reps, drop, n_drop)} when \code{cov = TRUE}
 }
 \description{
 Delete-1 jackknife standard errors, by parameter block

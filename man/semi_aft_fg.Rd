@@ -61,7 +61,14 @@ positive)}
 
 \item{var_comp}{If TRUE, estimates the variances (default FALSE)}
 
-\item{var_method}{\code{"jackknife"} (default) or \code{"bootstrap"}}
+\item{var_method}{\code{"jackknife"} (default, delete-1) or
+\code{"bootstrap"} (resampling of subjects). Each replicate
+re-estimates beta, the Kaplan-Meier censoring weights and theta (with the beta of
+the replicate, since the theta equation depends on beta) on the same subsample or
+resample, which also gives the joint covariance of the replicates.
+Replicates whose covariates lose rank (e.g. a binary covariate
+that became constant) or whose optimizer does not converge are
+discarded, with a warning.}
 
 \item{fast_path}{If TRUE (default) and \code{phi = "identity"},
 \code{norm_min = "L2"}, theta is estimated in closed form: least

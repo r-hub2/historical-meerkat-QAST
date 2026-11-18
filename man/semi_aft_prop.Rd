@@ -54,7 +54,13 @@ censoring}
 
 \item{var_comp}{If TRUE, estimates the variances (default FALSE)}
 
-\item{var_method}{\code{"jackknife"} (default) or \code{"bootstrap"}}
+\item{var_method}{\code{"jackknife"} (default, delete-1) or
+\code{"bootstrap"} (resampling of subjects). Each replicate
+re-estimates beta, the Cox censoring weights and theta on the same subsample or
+resample, which also gives the joint covariance of the replicates.
+Replicates whose covariates lose rank (e.g. a binary covariate
+that became constant) or whose optimizer does not converge are
+discarded, with a warning.}
 
 \item{data}{Data frame with the formula variables, when \code{t} is a
 formula}

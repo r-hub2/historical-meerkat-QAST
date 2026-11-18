@@ -37,7 +37,13 @@
 #' @param M Number of bootstrap replicates; required only with
 #'   \code{var_method = "bootstrap"}
 #' @param var_comp If TRUE, estimates the variances (default FALSE)
-#' @param var_method \code{"jackknife"} (default) or \code{"bootstrap"}
+#' @param var_method \code{"jackknife"} (default, delete-1) or
+#'   \code{"bootstrap"} (resampling of subjects). Each replicate
+#'   re-estimates beta, the Cox censoring weights and theta on the same subsample or
+#'   resample, which also gives the joint covariance of the replicates.
+#'   Replicates whose covariates lose rank (e.g. a binary covariate
+#'   that became constant) or whose optimizer does not converge are
+#'   discarded, with a warning.
 #' @param data Data frame with the formula variables, when \code{t} is a
 #'   formula
 #' @return Object of class \code{"qast_fit"} (see \code{\link{qast_fit}}),
@@ -162,110 +168,67 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
   betahat <- U1min$par
 
   # ---------------------------------------------------------------------------
-  # Variance of beta (var_comp = TRUE)
-  # ---------------------------------------------------------------------------
-  vcov_beta <- NULL
-  replicates <- list(beta = NULL, theta = NULL)
-  if (var_comp) {
-
-    refit_beta <- function(t_sub, z_sub, status_sub) {
-      lt_sub <- h1$linkfun(t_sub)
-      run_optimizer(betahat,
-                    function(b) U1_obj_cpp(b, lt_sub, z_sub, status_sub,
-                                           norm_min))$par
-    }
-
-    # The jackknife of beta is done together with that of theta (below): the
-    # theta refit does not depend on the beta refit, so the estimates per
-    # replicate are the same as in separate passes.
-
-    if (var_method == "bootstrap") {
-      dat <- data.frame(t, status, z)
-      boot_out <- boot::boot(data = dat, R = M,
-                             parallel = "multicore",
-                             ncpus = .qast_workers(),
-                             statistic = function(data, ind) {
-                               refit_beta(data[ind, 1],
-                                          as.matrix(data[ind, -(1:2)]),
-                                          data[ind, 2])
-                             })
-      vcov_beta <- cov(boot_out$t)
-      replicates$beta <- .qast_boot_reps(boot_out)
-    }
-  }
-
-  # ---------------------------------------------------------------------------
   # Stage 2: estimation of theta
   # ---------------------------------------------------------------------------
-  vcov_theta <- NULL
-
   if (!cens_weight) {
     # Without IPCW weights, theta uses the UNweighted equation (U1_obj_cpp) on lq
     U2min <- run_optimizer(init_coef(lq, z),
                            function(theta) U1_obj_cpp(theta, lq, z, status,
                                                       norm_min))
-    stopifnot("The theta estimation algorithm did not converge" =
-                extract_conv(U2min) == 0)
-    thetahat <- U2min$par
-
   } else {
     # IPCW weights from a Cox model (survival::coxph)
     HG_surv <- HG(X = z, t = t, status = status)
-
     U2min <- run_optimizer(init_coef(lq, z),
                            function(theta) U2_obj_cpp(theta, lq, z, status,
                                                       HG_surv, norm_min))
-    stopifnot("The theta estimation algorithm did not converge" =
-                extract_conv(U2min) == 0)
-    thetahat <- U2min$par
+  }
+  stopifnot("The theta estimation algorithm did not converge" =
+              extract_conv(U2min) == 0)
+  thetahat <- U2min$par
 
-    # -------------------------------------------------------------------------
-    # Variance of theta (var_comp = TRUE, recomputing HG)
-    # -------------------------------------------------------------------------
-    if (var_comp) {
+  # ---------------------------------------------------------------------------
+  # Variance (var_comp = TRUE, which requires cens_weight = TRUE)
+  #
+  # Each replicate refits beta and theta on the same subsample (jackknife)
+  # or resample (bootstrap), with the Cox censoring weights recomputed on
+  # it. A replicate whose covariates lose rank, or whose optimizer does not
+  # converge, gives NA and is discarded (with a warning).
+  # ---------------------------------------------------------------------------
+  vcov_beta <- vcov_theta <- NULL
+  replicates <- list(beta = NULL, theta = NULL)
+  if (var_comp) {
+    p <- ncol(z)
+    rank_z <- qr(z)$rank
+    na_p <- rep(NA_real_, p)
 
-      refit_theta <- function(t_sub, qt_sub, status_sub, z_sub) {
-        HG_sub <- HG(X = z_sub, t = t_sub, status = status_sub)
-        lq_sub <- h2$linkfun(qt_sub)
-        run_optimizer(thetahat,
-                      function(th) U2_obj_cpp(th, lq_sub, z_sub, status_sub,
-                                              HG_sub, norm_min))$par
-      }
-
-      if (var_method == "jackknife") {
-        # beta and theta in a single pass (see R/utils_jackknife.R)
-        p <- ncol(z)
-        jk <- .jackknife_se(
-          n,
-          refit = function(i) {
-            z_i <- z[-i, , drop = FALSE]
-            c(refit_beta(t[-i], z_i, status[-i]),
-              refit_theta(t[-i], qt[-i], status[-i], z_i))
-          },
-          blocks = list(beta = seq_len(p), theta = p + seq_len(p)),
-          cov = TRUE
-        )
-        vcov_beta  <- jk$beta$cov
-        vcov_theta <- jk$theta$cov
-        replicates <- list(beta = .qast_jack_reps(jk$beta),
-                           theta = .qast_jack_reps(jk$theta))
-      }
-
-      if (var_method == "bootstrap") {
-        dat <- data.frame(t, qt, status, z)
-        boot_out <- boot::boot(data = dat, R = M,
-                               parallel = "multicore",
-                               ncpus = .qast_workers(),
-                               statistic = function(data, ind) {
-                                 refit_theta(data[ind, 1],
-                                             data[ind, 2],
-                                             data[ind, 3],
-                                             as.matrix(data[ind, -(1:3)]))
-                               })
-        vcov_theta <- cov(boot_out$t)
-        replicates$theta <- .qast_boot_reps(boot_out)
-      }
+    refit <- function(rows) {
+      z_s <- z[rows, , drop = FALSE]
+      if (.qast_rank_deficient(z_s, rank_z)) return(c(na_p, na_p))
+      t_s <- t[rows]; status_s <- status[rows]
+      lt_s <- lt[rows]; lq_s <- lq[rows]
+      rb <- run_optimizer(betahat, function(b)
+        U1_obj_cpp(b, lt_s, z_s, status_s, norm_min))
+      b <- if (extract_conv(rb) == 0) rb$par else na_p
+      HG_s <- HG(X = z_s, t = t_s, status = status_s)
+      rt <- run_optimizer(thetahat, function(th)
+        U2_obj_cpp(th, lq_s, z_s, status_s, HG_s, norm_min))
+      th <- if (extract_conv(rt) == 0) rt$par else na_p
+      c(b, th)
     }
+    blocks <- list(beta = seq_len(p), theta = p + seq_len(p))
+
+    if (var_method == "jackknife") {
+      vr <- .jackknife_se(n, refit = function(i) refit(-i), blocks = blocks,
+                          cov = TRUE)
+      .qast_warn_discarded(vr, n, "jackknife")
+      replicates <- lapply(vr, .qast_jack_reps)
+    } else {
+      vr <- .qast_bootstrap(n, M, refit, blocks)
+      .qast_warn_discarded(vr, M, "bootstrap")
+      replicates <- lapply(vr, .qast_boot_reps)
+    }
+    vcov_beta  <- vr$beta$cov
+    vcov_theta <- vr$theta$cov
   }
 
   .new_qast_fit(
