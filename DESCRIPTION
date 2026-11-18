@@ -35,7 +35,7 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1
 NeedsCompilation: yes
-Packaged: 2026-11-17 19:29:27 UTC; alan
+Packaged: 2026-11-18 03:01:24 UTC; alan
 Author: Alan da Silva [aut, cre] (ORCID:
     <https://orcid.org/0000-0001-9674-9830>),
   Gisela Tunes da Silva [aut] (ORCID:
