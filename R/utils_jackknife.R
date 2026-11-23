@@ -164,3 +164,18 @@
 
 # Jackknife replicates (output of .jackknife_se with cov = TRUE)
 .qast_jack_reps <- function(blk) list(reps = blk$reps, drop = blk$drop)
+
+# Difference theta - beta from the joint block (columns beta, then theta)
+# of the same replicates: replicates of the difference (with the rows of
+# each replicate, as the other components) and its covariance
+# A V A', A = [-I, I] (the jackknife and bootstrap covariances are
+# quadratic forms of the replicates, so this equals the covariance of the
+# differences)
+.qast_diff_reps <- function(blk, p, var_method) {
+  r <- blk$reps
+  d <- r[, p + seq_len(p), drop = FALSE] - r[, seq_len(p), drop = FALSE]
+  A <- cbind(-diag(p), diag(p))
+  reps <- if (var_method == "jackknife") list(reps = d, drop = blk$drop)
+          else list(reps = d, index = blk$index)
+  list(reps = reps, cov = A %*% blk$cov %*% t(A))
+}

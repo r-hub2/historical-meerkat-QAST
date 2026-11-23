@@ -69,7 +69,7 @@
 #' fit <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d)
 #' fit
 #' @export
-#' @importFrom stats make.link lm runif optim coef vcov
+#' @importFrom stats make.link lm runif optim coef vcov confint
 #' @importFrom survival coxph Surv
 #' @importFrom minqa uobyqa
 #' @importFrom subplex subplex
@@ -194,7 +194,7 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
   # it. A replicate whose covariates lose rank, or whose optimizer does not
   # converge, gives NA and is discarded (with a warning).
   # ---------------------------------------------------------------------------
-  vcov_beta <- vcov_theta <- NULL
+  vcov_beta <- vcov_theta <- vcov_diff <- NULL
   replicates <- list(beta = NULL, theta = NULL)
   if (var_comp) {
     p <- ncol(z)
@@ -215,26 +215,31 @@ semi_aft_prop <- function(t, qt, status, z, h1 = "log", h2 = "log",
       th <- if (extract_conv(rt) == 0) rt$par else na_p
       c(b, th)
     }
-    blocks <- list(beta = seq_len(p), theta = p + seq_len(p))
+    # both: joint block, for the covariance of theta - beta
+    blocks <- list(beta = seq_len(p), theta = p + seq_len(p),
+                   both = seq_len(2L * p))
 
     if (var_method == "jackknife") {
       vr <- .jackknife_se(n, refit = function(i) refit(-i), blocks = blocks,
                           cov = TRUE)
       .qast_warn_discarded(vr, n, "jackknife")
-      replicates <- lapply(vr, .qast_jack_reps)
+      replicates <- lapply(vr[c("beta", "theta")], .qast_jack_reps)
     } else {
       vr <- .qast_bootstrap(n, M, refit, blocks)
       .qast_warn_discarded(vr, M, "bootstrap")
-      replicates <- lapply(vr, .qast_boot_reps)
+      replicates <- lapply(vr[c("beta", "theta")], .qast_boot_reps)
     }
     vcov_beta  <- vr$beta$cov
     vcov_theta <- vr$theta$cov
+    dr <- .qast_diff_reps(vr$both, p, var_method)
+    replicates$diff <- dr$reps
+    vcov_diff <- dr$cov
   }
 
   .new_qast_fit(
     model = "prop", call = cl, z = z, status = status,
     betahat = betahat, thetahat = thetahat,
-    vcov_beta = vcov_beta, vcov_theta = vcov_theta,
+    vcov_beta = vcov_beta, vcov_theta = vcov_theta, vcov_diff = vcov_diff,
     var_comp = var_comp, var_method = var_method, M = M,
     lt = lt, lq = lq, t = t, qt = qt, formula_info = formula_info,
     replicates = replicates,

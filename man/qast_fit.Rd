@@ -5,17 +5,27 @@
 \alias{print.qast_fit}
 \alias{coef.qast_fit}
 \alias{vcov.qast_fit}
+\alias{confint.qast_fit}
 \alias{summary.qast_fit}
 \alias{print.summary.qast_fit}
 \title{Methods for QAST fits}
 \usage{
 \method{print}{qast_fit}(x, digits = max(3L, getOption("digits") - 3L), ...)
 
-\method{coef}{qast_fit}(object, component = c("both", "beta", "theta"), ...)
+\method{coef}{qast_fit}(object, component = c("both", "beta", "theta", "diff"), ...)
 
-\method{vcov}{qast_fit}(object, component = c("beta", "theta"), ...)
+\method{vcov}{qast_fit}(object, component = c("beta", "theta", "diff"), ...)
 
-\method{summary}{qast_fit}(object, ...)
+\method{confint}{qast_fit}(
+  object,
+  parm,
+  level = 0.95,
+  component = c("beta", "theta", "diff"),
+  type = c("wald", "percentile"),
+  ...
+)
+
+\method{summary}{qast_fit}(object, conf.level = 0.95, ...)
 
 \method{print}{summary.qast_fit}(
   x,
@@ -31,15 +41,24 @@
 
 \item{...}{Not used}
 
-\item{component}{\code{"beta"} (survival time) or \code{"theta"}
-(quality-adjusted time); in \code{coef()}, \code{"both"} returns a
-matrix with the two columns}
+\item{component}{\code{"beta"} (survival time), \code{"theta"}
+(quality-adjusted time) or \code{"diff"} (\code{theta - beta}); in
+\code{coef()}, \code{"both"} returns a matrix with the columns
+\code{beta} and \code{theta}}
+
+\item{parm}{Coefficients (names or positions); all by default}
+
+\item{level, conf.level}{Confidence level}
+
+\item{type}{\code{"wald"} (normal interval, the default) or
+\code{"percentile"} (quantiles of the replicates; bootstrap fits only)}
 
 \item{signif.stars}{If TRUE, flags the p-values with stars}
 }
 \value{
 \code{coef()}: matrix (p x 2) or vector; \code{vcov()}:
   (jackknife or bootstrap) covariance matrix of the component;
+  \code{confint()}: matrix with the lower and upper limits;
   \code{summary()}: a \code{"summary.qast_fit"} object with the
   coefficient tables; \code{print()}: the object, invisibly.
 }
@@ -81,6 +100,28 @@ component, and stored in \code{intercept}, a named vector with elements
     (\code{cens_group}), the same weights as the estimating function
     (the marginal one without stratification, the default).
 }
+}
+
+\section{Quality per unit of survival}{
+
+\code{coef(fit, "diff")} is \eqn{\hat\theta - \hat\beta}{theta - beta}.
+With \code{h1 = h2 = "log"}, \eqn{\log\{Q(T)/T\} = (\theta - \beta)^\top Z +
+\varepsilon_2 - \varepsilon_1}{log(Q/T) = (theta - beta)'Z + e2 - e1}, so
+\eqn{\exp(\theta_j - \beta_j)}{exp(theta_j - beta_j)} is the change in
+the quality of life per unit of survival for a unit increase in the
+covariate \eqn{j}, and also the ratio of the mean quality-adjusted
+survival per unit of mean survival (Fine and Gelber, 2001, Section 2;
+the ratio of means extrapolates beyond the follow-up). Its variance
+uses the joint replicates of the fit, in which beta and theta are
+estimated on the same subsamples or resamples:
+\eqn{Var(\hat\theta_j - \hat\beta_j) = Var(\hat\theta_j) +
+Var(\hat\beta_j) - 2 Cov(\hat\beta_j, \hat\theta_j)}{Var(theta_j -
+beta_j) = Var(theta_j) + Var(beta_j) - 2 Cov(beta_j, theta_j)}.
+\code{confint()} gives the normal interval of Fine and Gelber (2001,
+Section 3) or, with bootstrap replicates, the percentile interval;
+exponentiate the limits for the ratio. \code{summary()} shows the
+table and the normal interval of the ratio.
+
 The linear predictor of the transformed time is then
 \code{intercept["beta"] + z \%*\% beta} (and likewise with
 \code{theta}). The intercepts have no standard errors and are not
@@ -99,9 +140,19 @@ fit <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
                    L = quantile(d$t, 0.9))
 fit
 coef(fit)
+
+# Quality per unit of survival: exp(theta - beta), with intervals
+fit_v <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
+                     L = quantile(d$t, 0.9), var_comp = TRUE)
+summary(fit_v)
+exp(confint(fit_v, component = "diff"))
 }
 \references{
-Ding, Y. and Nan, B. (2015). Estimating mean survival time:
+Fine, J. P. and Gelber, R. D. (2001). Joint regression
+  analysis of survival and quality-adjusted survival. \emph{Biometrics},
+  57(2), 376-382. \doi{10.1111/j.0006-341X.2001.00376.x}
+
+  Ding, Y. and Nan, B. (2015). Estimating mean survival time:
   when is it possible? \emph{Scandinavian Journal of Statistics}, 42(2),
   397-413. \doi{10.1111/sjos.12112}
 

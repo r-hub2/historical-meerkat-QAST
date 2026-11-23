@@ -27,6 +27,9 @@ fit_fg
 ## ----fg-summary---------------------------------------------------------------
 summary(fit_fg)
 
+## ----diff---------------------------------------------------------------------
+exp(confint(fit_fg, component = "diff"))
+
 ## ----fg-cens------------------------------------------------------------------
 fit_fg1 <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
                        L = quantile(d$t, 0.9), cens_group = d$trt)

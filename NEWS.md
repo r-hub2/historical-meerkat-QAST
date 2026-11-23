@@ -61,8 +61,16 @@ First release.
   L = 5)`; factors enter as indicators, without an intercept. Vectors and a
   covariate matrix are still accepted.
 * Fits return an object of class `qast_fit` with `print()`, `summary()`,
-  `coef()` and `vcov()` methods. `vcov()` returns the full jackknife or
-  bootstrap covariance matrix of each component.
+  `coef()`, `vcov()` and `confint()` methods. `vcov()` returns the full
+  jackknife or bootstrap covariance matrix of each component.
+* Quality per unit of survival: `coef(fit, "diff")` is `theta - beta`,
+  whose exponential (with log links) is the change in quality of life per
+  unit of survival and the ratio of mean quality-adjusted survival per
+  unit of mean survival (Fine and Gelber, 2001). Its variance uses the
+  covariance of beta and theta over the same replicates; `summary()` shows
+  the table and the normal interval of `exp(theta - beta)`, and
+  `confint(fit, component = "diff")` gives the normal or, for bootstrap
+  fits, the percentile interval.
 * Only the data (and `L` for `semi_aft_fg()`) are required; the defaults are
   `h1 = h2 = "log"`, `method = "Nelder-Mead"`, `norm_min = "L2"` and
   `var_comp = FALSE`. `M` is required only with `var_method = "bootstrap"`.

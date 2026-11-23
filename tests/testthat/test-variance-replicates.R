@@ -122,3 +122,51 @@ test_that(".qast_bootstrap: blocks with NA are discarded separately", {
   expect_false(any(vr$b$index == 1L))
   expect_equal(vr$a$cov[1, 1], var(rowMeans(vr$a$index)))
 })
+
+test_that("theta - beta: joint covariance, confint and summary", {
+  d <- mk_rep_data(n = 70)
+  set.seed(5)
+  fb <- semi_aft_fg(d$t, d$qt, d$status, d$z, L = d$L, var_comp = TRUE,
+                    var_method = "bootstrap", M = 30)
+  fj <- semi_aft_prop(d$t, d$qt, d$status, d$x, var_comp = TRUE)
+  for (f in list(fb, fj)) {
+    dd <- f$replicates$diff$reps
+    expect_equal(coef(f, "diff"), f$theta - f$beta)
+    # covariance of the differences of the same replicates
+    ref <- if (f$var_method == "bootstrap") cov(dd) else {
+      (f$n - 1) / nrow(dd) * crossprod(sweep(dd, 2, colMeans(dd)))
+    }
+    expect_equal(unname(vcov(f, "diff")), ref, tolerance = 1e-12)
+    # = Var(theta) + Var(beta) - 2 Cov(beta, theta), from the joint rows
+    rb <- f$replicates$beta$reps; rt <- f$replicates$theta$reps
+    if (f$var_method == "bootstrap") {
+      expect_equal(unname(f$var_diff),
+                   apply(rt, 2, var) + apply(rb, 2, var) -
+                     2 * diag(cov(rb, rt)), tolerance = 1e-12)
+    }
+    # Wald interval
+    ci <- confint(f, component = "diff", level = 0.9)
+    se <- sqrt(f$var_diff)
+    expect_equal(unname(ci[, 1]), unname(coef(f, "diff") - qnorm(0.95) * se))
+    expect_identical(colnames(ci), c("5 %", "95 %"))
+    s <- summary(f)
+    expect_equal(unname(s$ratio[, 1]), unname(exp(coef(f, "diff"))))
+    expect_equal(unname(s$ratio[, 2]),
+                 unname(exp(confint(f, component = "diff")[, 1])))
+    expect_output(print(s), "Quality per unit of survival")
+  }
+  # percentile interval: bootstrap only
+  pc <- confint(fb, "trt", component = "diff", type = "percentile")
+  expect_equal(unname(pc[1, ]),
+               unname(quantile(fb$replicates$diff$reps[, 1], c(0.025, 0.975))))
+  expect_error(confint(fj, component = "diff", type = "percentile"),
+               "bootstrap")
+  expect_error(confint(fj, "nope"), "unknown")
+  # beta and theta intervals use their own variances
+  expect_equal(unname(confint(fj, component = "beta")[, 2]),
+               unname(fj$beta + qnorm(0.975) * sqrt(fj$var_beta)))
+  # without variance
+  f0 <- semi_aft_prop(d$t, d$qt, d$status, d$x)
+  expect_error(confint(f0), "var_comp")
+  expect_null(summary(f0)$ratio)
+})

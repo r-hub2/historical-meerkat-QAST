@@ -225,6 +225,7 @@ Qsurv <- function(time, qtime, status) {
 
 .new_qast_fit <- function(model, call, z, status, betahat, thetahat,
                           vcov_beta, vcov_theta, var_comp, var_method, M,
+                          vcov_diff = NULL,
                           settings, lt, lq, t, qt, formula_info = NULL,
                           replicates = NULL) {
   nms <- colnames(z)
@@ -244,6 +245,12 @@ Qsurv <- function(time, qtime, status) {
     fit$var_theta <- stats::setNames(diag(vcov_theta), nms)
     fit$vcov_beta  <- vcov_beta
     fit$vcov_theta <- vcov_theta
+    # theta - beta, from the joint replicates
+    if (!is.null(vcov_diff)) {
+      dimnames(vcov_diff) <- list(nms, nms)
+      fit$var_diff  <- stats::setNames(diag(vcov_diff), nms)
+      fit$vcov_diff <- vcov_diff
+    }
   }
   fit$model <- model
   fit$call <- call
@@ -322,12 +329,35 @@ Qsurv <- function(time, qtime, status) {
 #'     (\code{cens_group}), the same weights as the estimating function
 #'     (the marginal one without stratification, the default).
 #' }
+#' @section Quality per unit of survival:
+#' \code{coef(fit, "diff")} is \eqn{\hat\theta - \hat\beta}{theta - beta}.
+#' With \code{h1 = h2 = "log"}, \eqn{\log\{Q(T)/T\} = (\theta - \beta)^\top Z +
+#' \varepsilon_2 - \varepsilon_1}{log(Q/T) = (theta - beta)'Z + e2 - e1}, so
+#' \eqn{\exp(\theta_j - \beta_j)}{exp(theta_j - beta_j)} is the change in
+#' the quality of life per unit of survival for a unit increase in the
+#' covariate \eqn{j}, and also the ratio of the mean quality-adjusted
+#' survival per unit of mean survival (Fine and Gelber, 2001, Section 2;
+#' the ratio of means extrapolates beyond the follow-up). Its variance
+#' uses the joint replicates of the fit, in which beta and theta are
+#' estimated on the same subsamples or resamples:
+#' \eqn{Var(\hat\theta_j - \hat\beta_j) = Var(\hat\theta_j) +
+#' Var(\hat\beta_j) - 2 Cov(\hat\beta_j, \hat\theta_j)}{Var(theta_j -
+#' beta_j) = Var(theta_j) + Var(beta_j) - 2 Cov(beta_j, theta_j)}.
+#' \code{confint()} gives the normal interval of Fine and Gelber (2001,
+#' Section 3) or, with bootstrap replicates, the percentile interval;
+#' exponentiate the limits for the ratio. \code{summary()} shows the
+#' table and the normal interval of the ratio.
+#'
 #' The linear predictor of the transformed time is then
 #' \code{intercept["beta"] + z \%*\% beta} (and likewise with
 #' \code{theta}). The intercepts have no standard errors and are not
 #' part of \code{coef()} or \code{vcov()}.
 #'
-#' @references Ding, Y. and Nan, B. (2015). Estimating mean survival time:
+#' @references Fine, J. P. and Gelber, R. D. (2001). Joint regression
+#'   analysis of survival and quality-adjusted survival. \emph{Biometrics},
+#'   57(2), 376-382. \doi{10.1111/j.0006-341X.2001.00376.x}
+#'
+#'   Ding, Y. and Nan, B. (2015). Estimating mean survival time:
 #'   when is it possible? \emph{Scandinavian Journal of Statistics}, 42(2),
 #'   397-413. \doi{10.1111/sjos.12112}
 #'
@@ -337,13 +367,19 @@ Qsurv <- function(time, qtime, status) {
 #'
 #' @param x,object Object of class \code{"qast_fit"}
 #' @param digits Significant digits when printing
-#' @param component \code{"beta"} (survival time) or \code{"theta"}
-#'   (quality-adjusted time); in \code{coef()}, \code{"both"} returns a
-#'   matrix with the two columns
+#' @param component \code{"beta"} (survival time), \code{"theta"}
+#'   (quality-adjusted time) or \code{"diff"} (\code{theta - beta}); in
+#'   \code{coef()}, \code{"both"} returns a matrix with the columns
+#'   \code{beta} and \code{theta}
+#' @param parm Coefficients (names or positions); all by default
+#' @param level,conf.level Confidence level
+#' @param type \code{"wald"} (normal interval, the default) or
+#'   \code{"percentile"} (quantiles of the replicates; bootstrap fits only)
 #' @param signif.stars If TRUE, flags the p-values with stars
 #' @param ... Not used
 #' @return \code{coef()}: matrix (p x 2) or vector; \code{vcov()}:
 #'   (jackknife or bootstrap) covariance matrix of the component;
+#'   \code{confint()}: matrix with the lower and upper limits;
 #'   \code{summary()}: a \code{"summary.qast_fit"} object with the
 #'   coefficient tables; \code{print()}: the object, invisibly.
 #' @name qast_fit
@@ -359,6 +395,12 @@ Qsurv <- function(time, qtime, status) {
 #'                    L = quantile(d$t, 0.9))
 #' fit
 #' coef(fit)
+#'
+#' # Quality per unit of survival: exp(theta - beta), with intervals
+#' fit_v <- semi_aft_fg(Qsurv(t, qt, status) ~ trt + sex, data = d,
+#'                      L = quantile(d$t, 0.9), var_comp = TRUE)
+#' summary(fit_v)
+#' exp(confint(fit_v, component = "diff"))
 NULL
 
 #' @rdname qast_fit
@@ -387,22 +429,67 @@ print.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L),
 
 #' @rdname qast_fit
 #' @export
-coef.qast_fit <- function(object, component = c("both", "beta", "theta"),
+coef.qast_fit <- function(object,
+                          component = c("both", "beta", "theta", "diff"),
                           ...) {
   component <- match.arg(component)
   switch(component,
          both  = cbind(beta = object$beta, theta = object$theta),
          beta  = object$beta,
-         theta = object$theta)
+         theta = object$theta,
+         diff  = object$theta - object$beta)
 }
 
 #' @rdname qast_fit
 #' @export
-vcov.qast_fit <- function(object, component = c("beta", "theta"), ...) {
+vcov.qast_fit <- function(object, component = c("beta", "theta", "diff"),
+                          ...) {
   component <- match.arg(component)
   if (is.null(object$vcov_beta))
     stop("fit has no variance: refit with var_comp = TRUE", call. = FALSE)
-  if (component == "beta") object$vcov_beta else object$vcov_theta
+  if (component == "diff" && is.null(object$vcov_diff))
+    stop("this fit has no joint replicates for theta - beta; refit it ",
+         "with the current version of QAST", call. = FALSE)
+  switch(component,
+         beta  = object$vcov_beta,
+         theta = object$vcov_theta,
+         diff  = object$vcov_diff)
+}
+
+#' @rdname qast_fit
+#' @export
+confint.qast_fit <- function(object, parm, level = 0.95,
+                             component = c("beta", "theta", "diff"),
+                             type = c("wald", "percentile"), ...) {
+  component <- match.arg(component)
+  type <- match.arg(type)
+  if (!is.numeric(level) || length(level) != 1L || !(level > 0 && level < 1))
+    stop("level must be a number in (0, 1)", call. = FALSE)
+  est <- coef(object, component)
+  V <- vcov(object, component)
+  if (missing(parm)) parm <- names(est)
+  if (is.numeric(parm)) parm <- names(est)[parm]
+  if (anyNA(parm) || !all(parm %in% names(est)))
+    stop("unknown coefficients in parm", call. = FALSE)
+  a <- (1 - level) / 2
+  probs <- c(a, 1 - a)
+  if (type == "wald") {
+    q <- stats::qnorm(1 - a)
+    se <- sqrt(diag(V))[parm]
+    ci <- cbind(est[parm] - q * se, est[parm] + q * se)
+  } else {
+    if (!identical(object$var_method, "bootstrap"))
+      stop("type = \"percentile\" requires bootstrap replicates ",
+           "(var_method = \"bootstrap\")", call. = FALSE)
+    reps <- object$replicates[[component]]$reps
+    colnames(reps) <- names(est)
+    ci <- t(apply(reps[, parm, drop = FALSE], 2L, stats::quantile,
+                  probs = probs, names = FALSE))
+  }
+  dimnames(ci) <- list(parm, paste(format(100 * probs, trim = TRUE,
+                                          scientific = FALSE, digits = 3),
+                                   "%"))
+  ci
 }
 
 .qast_coef_table <- function(est, v) {
@@ -421,14 +508,27 @@ vcov.qast_fit <- function(object, component = c("beta", "theta"), ...) {
 
 #' @rdname qast_fit
 #' @export
-summary.qast_fit <- function(object, ...) {
+summary.qast_fit <- function(object, conf.level = 0.95, ...) {
+  diff <- object$theta - object$beta
+  ratio <- NULL
+  if (!is.null(object$var_diff)) {
+    q <- stats::qnorm(1 - (1 - conf.level) / 2)
+    se <- sqrt(object$var_diff)
+    ratio <- cbind(exp(diff), exp(diff - q * se), exp(diff + q * se))
+    dimnames(ratio) <- list(names(diff),
+                            c("exp(theta - beta)",
+                              sprintf("lower .%02d", round(100 * conf.level)),
+                              sprintf("upper .%02d", round(100 * conf.level))))
+  }
   out <- list(
     model = object$model, call = object$call, n = object$n,
     n_events = object$n_events, settings = object$settings,
     var_method = object$var_method, M = object$M,
     intercept = object$intercept,
     beta  = .qast_coef_table(object$beta, object$var_beta),
-    theta = .qast_coef_table(object$theta, object$var_theta)
+    theta = .qast_coef_table(object$theta, object$var_theta),
+    diff  = .qast_coef_table(diff, object$var_diff),
+    ratio = ratio, conf.level = conf.level
   )
   class(out) <- "summary.qast_fit"
   out
@@ -460,6 +560,15 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
                       signif.legend = FALSE)
   cat("Intercept (IPCW mean of the residuals): ",
       format(x$intercept[["theta"]], digits = digits), "\n", sep = "")
+  if (!is.null(x$diff)) {
+    cat(rule, "\nQuality per unit of survival (theta - beta)\n", sep = "")
+    stats::printCoefmat(x$diff, digits = digits, signif.stars = signif.stars,
+                        signif.legend = FALSE)
+    if (!is.null(x$ratio)) {
+      cat("\n")
+      print(x$ratio, digits = digits)
+    }
+  }
   if (signif.stars && ncol(x$theta) > 2L)
     cat("---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
   invisible(x)
