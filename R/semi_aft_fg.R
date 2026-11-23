@@ -7,6 +7,19 @@
 #' subjects, truncated at \code{L} and weighted by the inverse of the
 #' Kaplan-Meier censoring survival in the censoring group of each subject.
 #'
+#' @section Survival time component:
+#'   \code{beta} minimizes the norm of the rank estimating function of Wei,
+#'   Ying and Lin (1990) and Tsiatis (1990) with Gehan weights (the choice
+#'   of Fine and Gelber, 2001, Section 3), the same in both models. The
+#'   function is a step function of \code{beta}, so it has no exact root
+#'   and its norm is minimized.
+#'
+#' @section Censoring:
+#'   The censoring time is assumed independent of the survival and
+#'   quality-adjusted survival times given the covariates, and dependent on
+#'   them only through the censoring groups (\code{cens_group}); see Fine
+#'   and Gelber (2001, Section 3).
+#'
 #' @param t Observed survival times, or a formula
 #'   \code{Qsurv(t, qt, status) ~ covariates} (see \code{\link{Qsurv}}); with
 #'   a formula, \code{qt}, \code{status} and \code{z} come from it and from
@@ -73,7 +86,15 @@
 #'   \code{vcov_theta}
 #' @references Fine, J. P. and Gelber, R. D. (2001). Joint regression
 #'   analysis of survival and quality-adjusted survival. \emph{Biometrics},
-#'   57(2), 376-382.
+#'   57(2), 376-382. \doi{10.1111/j.0006-341X.2001.00376.x}
+#'
+#'   Wei, L. J., Ying, Z. and Lin, D. Y. (1990). Linear regression analysis
+#'   of censored survival data based on rank tests. \emph{Biometrika},
+#'   77(4), 845-851. \doi{10.1093/biomet/77.4.845}
+#'
+#'   Tsiatis, A. A. (1990). Estimating regression parameters using linear
+#'   rank tests for censored data. \emph{The Annals of Statistics}, 18(1),
+#'   354-372. \doi{10.1214/aos/1176347504}
 #' @seealso \code{\link{semi_aft_prop}}; \code{\link{qast_fit}} for
 #'   \code{print}, \code{summary}, \code{coef} and \code{vcov}
 #' @examples

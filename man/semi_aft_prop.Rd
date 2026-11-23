@@ -84,6 +84,46 @@ a Cox model for the quality-adjusted component.
   (2001) model, implemented in \code{\link{semi_aft_fg}}.
 }
 
+\section{Survival time component}{
+
+  \code{beta} minimizes the norm of the rank estimating function of Wei,
+  Ying and Lin (1990) and Tsiatis (1990) with Gehan weights (the choice
+  of Fine and Gelber, 2001, Section 3), the same in both models. The
+  function is a step function of \code{beta}, so it has no exact root
+  and its norm is minimized.
+}
+
+\section{Censoring}{
+
+  The quality-adjusted time is subject to induced informative
+  censoring: the accumulated quality-adjusted time at censoring,
+  \eqn{Q(C)}, depends on the quality of life of the subject. The theta
+  equation corrects it with inverse probability of censoring weights
+  \eqn{\delta_i / \hat G(T_i \mid Z_i)}{delta_i / G(T_i | Z_i)}, which assume:
+  \enumerate{
+    \item the censoring time \eqn{C} is independent of
+      \eqn{\{T, Q(T)\}}{(T, Q(T))} given the covariates \eqn{Z}, as in
+      Fine and Gelber (2001, Section 3);
+    \item the censoring hazard follows a proportional hazards model in
+      the same covariates, \eqn{\lambda_C(t \mid Z) = \lambda_0(t)
+      \exp(\gamma^\top Z)}{lambda_C(t | Z) = lambda_0(t) exp(gamma'Z)},
+      fitted by \code{survival::coxph} on \code{Surv(t, 1 - status)}.
+      This is the alternative that Fine and Gelber (2001, Section 5)
+      suggest to their discrete censoring groups, and it allows
+      continuous covariates;
+    \item positivity: \eqn{G(T \mid Z) > 0}{G(T | Z) > 0} over the
+      survival times, i.e. every subject could be followed until death.
+      Subjects whose survival exceeds the follow-up get weights that
+      are very large or undefined.
+  }
+  The proportional hazards assumption can be checked with
+  \code{survival::cox.zph(survival::coxph(Surv(t, 1 - status) ~ z))}.
+  The intercepts, \code{\link{predict.qast_fit}} and
+  \code{\link{qast_metrics}} use the marginal Kaplan-Meier censoring
+  survival instead, which assumes censoring independent of the
+  covariates.
+}
+
 \section{Numerical kernel}{
  the estimating equations are evaluated by the
   C++ kernels \code{U1_obj_cpp}/\code{U2_obj_cpp} in src/aft_core.cpp.
@@ -108,6 +148,18 @@ da Silva, A. (2026). \emph{Regression analysis of
   care units: a new estimation method}. Doctoral thesis, Institute of
   Mathematics and Statistics, University of Sao Paulo. Advisor: Gisela
   Tunes da Silva.
+
+  Fine, J. P. and Gelber, R. D. (2001). Joint regression analysis of
+  survival and quality-adjusted survival. \emph{Biometrics}, 57(2),
+  376-382. \doi{10.1111/j.0006-341X.2001.00376.x}
+
+  Wei, L. J., Ying, Z. and Lin, D. Y. (1990). Linear regression analysis
+  of censored survival data based on rank tests. \emph{Biometrika},
+  77(4), 845-851. \doi{10.1093/biomet/77.4.845}
+
+  Tsiatis, A. A. (1990). Estimating regression parameters using linear
+  rank tests for censored data. \emph{The Annals of Statistics}, 18(1),
+  354-372. \doi{10.1214/aos/1176347504}
 }
 \seealso{
 \code{\link{semi_aft_fg}} for the Fine and Gelber (2001) model;

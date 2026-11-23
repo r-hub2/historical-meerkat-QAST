@@ -96,6 +96,12 @@ covariates (the fit itself uses a Cox model). The survival
 probabilities are \eqn{P(T > t \mid z)}{P(T > t | z)} (right-continuous
 steps), the same convention as \code{surv_qt_fun()}.
 
+For the survival time, this is the prediction of Ying, Wei and Lin
+(1992): the Kaplan-Meier curve of the residuals of the rank estimate,
+evaluated at \eqn{h_1(t) - z^\top\hat\beta}{h1(t) - z'beta}. They use the
+left-continuous version of the curve, \eqn{P(e \ge x)}{P(e >= x)}; the
+two versions differ only at the jumps.
+
 With \code{se.fit = TRUE} (fits with \code{var_comp = TRUE}), the
 prediction is recomputed in every jackknife or bootstrap replicate of
 the fit: the replicate coefficients, and the intercept and the residual
@@ -142,7 +148,11 @@ predict(fit_v, new, type = "survival", component = "theta",
         times = c(0.5, 1), se.fit = TRUE)
 }
 \references{
-Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator
+Ying, Z., Wei, L. J. and Lin, J. S. (1992). Prediction of
+  survival probability based on a linear regression model.
+  \emph{Biometrika}, 79(1), 205-209. \doi{10.1093/biomet/79.1.205}
+
+  Zhao, H. and Tsiatis, A. A. (1997). A consistent estimator
   for the distribution of quality adjusted survival time.
   \emph{Biometrika}, 84(2), 339-348. \doi{10.1093/biomet/84.2.339}
 }
