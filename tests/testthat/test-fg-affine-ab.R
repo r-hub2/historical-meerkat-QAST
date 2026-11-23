@@ -81,7 +81,7 @@ test_that("Affine: equals the legacy kernel and the R reference on a grid of bet
       expect_equal(parts_aff, parts_leg, tolerance = 1e-10)
       
       # Triangulation with the pure R reference
-      parts_ref <- QAST:::U2_parts_fg_ref(theta, cas$lt, cas$lq, cas$z,
+      parts_ref <- U2_parts_fg_ref(theta, cas$lt, cas$lq, cas$z,
                                           cas$status, beta, cas$hL,
                                           km, "identity")
       expect_equal(parts_leg, parts_ref, tolerance = 1e-10)
@@ -92,41 +92,6 @@ test_that("Affine: equals the legacy kernel and the R reference on a grid of bet
                                         cas$status, beta, cas$hL,
                                         km, "identity", nm)
         expect_equal(obj_aff, obj_leg, tolerance = 1e-10)
-      }
-    }
-  }
-})
-
-test_that("Compiled piecewise: equals the legacy kernel on a grid of beta x theta", {
-  p <- 2
-  beta_grid  <- mk_fg_beta_grid(p)
-  theta_grid <- fg_theta_grid(p)
-  
-  for (bi in seq_len(nrow(beta_grid))) {
-    for (ti in seq_len(nrow(theta_grid))) {
-      
-      cas <- mk_fg_case(seed = 80 + bi, n = 60, p = p)
-      beta  <- beta_grid[bi, ]
-      theta <- theta_grid[ti, ]
-      
-      km <- QAST:::prep_km_by_column(cas$z, cas$t, cas$status)
-      pairs <- QAST:::make_fg_pairs_cpp(cas$lt, cas$lq, cas$z,
-                                        cas$status, beta, cas$hL,
-                                        km, "piecewise")
-      pw <- QAST:::compile_fg_pw_cpp(pairs)
-      
-      parts_pw  <- QAST:::eval_fg_parts_pw_cpp(pw, cas$lq, cas$z, theta)
-      parts_leg <- QAST:::U2_parts_fg_cpp(theta, cas$lt, cas$lq, cas$z,
-                                          cas$status, beta, cas$hL,
-                                          km, "piecewise")
-      expect_equal(parts_pw, parts_leg, tolerance = 1e-10)
-      
-      for (nm in c("L1", "L2")) {
-        obj_pw  <- QAST:::eval_fg_obj_pw_cpp(pw, cas$lq, cas$z, theta, nm)
-        obj_leg <- QAST:::U2_obj_fg_cpp(theta, cas$lt, cas$lq, cas$z,
-                                        cas$status, beta, cas$hL,
-                                        km, "piecewise", nm)
-        expect_equal(obj_pw, obj_leg, tolerance = 1e-10)
       }
     }
   }
@@ -153,11 +118,11 @@ test_that("Constant column: identically null component in every path", {
   # The identity object stores no pairs; the piecewise one is built apart
   pairs_pw <- QAST:::make_fg_pairs_cpp(cas$lt, cas$lq, cas$z, cas$status,
                                        beta, cas$hL, km, "piecewise")
-  pw  <- QAST:::compile_fg_pw_cpp(pairs_pw)
   
   th <- c(0.2, -0.1)
   expect_identical(QAST:::eval_fg_parts_affine_cpp(aff, th)[2], 0.0)
-  expect_identical(QAST:::eval_fg_parts_pw_cpp(pw, cas$lq, cas$z, th)[2], 0.0)
+  expect_identical(QAST:::eval_fg_parts_cpp(pairs_pw, cas$lq, cas$z, th,
+                                            "piecewise")[2], 0.0)
   expect_identical(QAST:::U2_parts_fg_cpp(th, cas$lt, cas$lq, cas$z,
                                           cas$status, beta, cas$hL,
                                           km, "identity")[2], 0.0)

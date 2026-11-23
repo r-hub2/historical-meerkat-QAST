@@ -26,18 +26,29 @@ First release.
   (Ding and Nan, 2015) and the IPCW mean of the quality-adjusted residuals
   (Zhao and Tsiatis, 2000), in `fit$intercept`, shown by `print()` and
   `summary()`.
-* `predict()` method for fits: linear predictors (`type = "lp"`) and
-  survival probabilities given the covariates (`type = "survival"`), from
-  the Kaplan-Meier curve of the survival time residuals and the Zhao and
-  Tsiatis (1997) estimator of the quality-adjusted residuals; accepts
-  `newdata` for formula and matrix fits. With `se.fit = TRUE` (fits with
-  `var_comp = TRUE`), standard errors and pointwise confidence limits from
-  the jackknife or bootstrap replicates of the fit, with the intercept and
-  the residual distribution re-estimated in each replicate.
+* `predict()` method for fits: linear predictors (`type = "lp"`),
+  survival probabilities given the covariates (`type = "survival"`) and
+  mean times restricted to `tau` (`type = "rmean"`, computed exactly on
+  the step curves), from the Kaplan-Meier curve of the survival time
+  residuals and the Zhao and Tsiatis (1997) estimator of the
+  quality-adjusted residuals; accepts `newdata` for formula and matrix
+  fits. With `se.fit = TRUE` (fits with `var_comp = TRUE`), standard
+  errors (and, for the survival probabilities, pointwise confidence
+  limits) from the jackknife or bootstrap replicates of the fit, with the
+  intercept and the residual distribution re-estimated in each replicate.
 * `qast_pp()`: P-P plots of the residuals by covariate group, the
   lack-of-fit diagnostic of Fine and Gelber (2001, Section 4), with the
   trimmed conditional quality-adjusted distribution for `semi_aft_fg()`
   fits; `print()` and `plot()` methods.
+* `qast_metrics()`: Brier score over time, integrated Brier score,
+  explained variation against the model without covariates and IPCW mean
+  absolute error of the restricted mean, for a fit or for a matrix of
+  survival probabilities from any model. For the quality-adjusted time,
+  whose censoring is induced informative, the weights use the censoring
+  survival on the survival time scale, as the estimator of Zhao and
+  Tsiatis (1997), instead of the censoring curve of the quality-adjusted
+  time used by the usual tools. The total IPCW mass is reported as a
+  positivity diagnostic.
 * `surv_qt_fun()` implements the estimator of Zhao and Tsiatis (1997) for
   the survival curve of the quality-adjusted time, evaluated as
   P(Q > q) at each subject (the convention of `predict()` and of the

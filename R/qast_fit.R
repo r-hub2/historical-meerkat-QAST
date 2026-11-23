@@ -524,6 +524,63 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
   matrix(surv_at(dist, as.vector(x)), nrow = nrow(x))
 }
 
+# Restriction time of type = "rmean": a scalar, or a vector named by
+# component (beta, theta); default, the largest event time of the fit
+# data on the scale of the component
+.qast_tau <- function(object, comp, tau) {
+  if (is.null(tau)) return(max(object$event_times[[comp]]))
+  if (!is.numeric(tau) || anyNA(tau) || length(tau) < 1L)
+    stop("tau must be a positive number (or one per component, named ",
+         "beta and theta)", call. = FALSE)
+  if (length(tau) > 1L) {
+    if (is.null(names(tau)) || !comp %in% names(tau))
+      stop("with more than one value, tau must be named by component ",
+           "(beta, theta)", call. = FALSE)
+    tau <- tau[[comp]]
+  }
+  if (!is.finite(tau) || tau <= 0)
+    stop("tau must be finite and positive", call. = FALSE)
+  unname(tau)
+}
+
+# Increasing link (the restricted mean maps the residual jumps back to
+# the time scale with linkinv)
+.qast_link_increasing <- function(object, comp) {
+  link <- stats::make.link(object$settings[[if (comp == "beta") "h1" else "h2"]])
+  if (!(link$linkfun(2) > link$linkfun(1)))
+    stop(sprintf("type = \"rmean\" requires an increasing link (link \"%s\")",
+                 link$name), call. = FALSE)
+  link
+}
+
+# Restricted mean int_0^tau S(t | z_k) dt, exact for the step curve:
+# S(t | z) = S_res(h(t) - z'b) jumps at u_j = h^{-1}(v_j + z'b), v_j the
+# support of the residual distribution (residuals below h(0) map to 0),
+# and is constant between jumps (val: value before the first jump and
+# after each one)
+.qast_rmean <- function(dist, coef, z, comp, link, tau) {
+  if (comp == "beta") {
+    v <- dist$time
+    val <- c(1, dist$surv)
+  } else {
+    v <- dist$value
+    tail_mass <- rev(cumsum(rev(dist$mass)))
+    val <- pmin(pmax(c(tail_mass, 0), 0), 1)
+  }
+  h0 <- suppressWarnings(link$linkfun(0))
+  if (is.na(h0)) h0 <- -Inf
+  lp <- drop(z %*% coef)
+  vapply(lp, function(a) {
+    eta <- v + a
+    u <- numeric(length(eta))
+    pos <- eta > h0
+    u[pos] <- link$linkinv(eta[pos])
+    lo <- pmin(c(0, u), tau)
+    hi <- pmin(c(u, Inf), tau)
+    sum(val * (hi - lo))
+  }, numeric(1))
+}
+
 # Distribution of the residuals of a component recomputed on the rows
 # 'rows' of the data of the fit (jackknife or bootstrap replicate), with
 # the same estimators and censoring weights as the fit
@@ -610,6 +667,16 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #' censoring weights are re-estimated in every replicate, as in the
 #' variance of the coefficients.
 #'
+#' \code{type = "rmean"} gives the restricted mean
+#' \eqn{\int_0^\tau S(t \mid z)\,dt = E\{\min(T, \tau) \mid z\}}{int_0^tau
+#' S(t | z) dt = E[min(T, tau) | z]} (and the same for the quality-adjusted
+#' time), computed exactly on the step curve of each subject: the curves
+#' are steps between the jumps \eqn{h^{-1}(v_j + z^\top\hat\beta)}{h^-1(v_j
+#' + z'beta)}, \eqn{v_j} the residuals. The unrestricted mean is not used
+#' because the right tail of the curves is not identified when the
+#' largest times are censored. It requires an increasing link (such as
+#' the default \code{"log"}).
+#'
 #' @param object Object of class \code{"qast_fit"}
 #' @param newdata Covariates to predict for. For fits from a formula, a
 #'   data frame with the covariates of the formula (factors with the
@@ -617,14 +684,19 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #'   with the columns of \code{z} (matched by name when the fit had
 #'   column names). \code{NULL} (default) uses the covariates of the fit.
 #' @param type \code{"lp"} (linear predictor including the intercept,
-#'   \code{intercept + z \%*\% coef}, on the scale of the link) or
-#'   \code{"survival"} (survival probabilities at \code{times})
+#'   \code{intercept + z \%*\% coef}, on the scale of the link),
+#'   \code{"survival"} (survival probabilities at \code{times}) or
+#'   \code{"rmean"} (mean time restricted to \code{tau})
 #' @param component \code{"both"}, \code{"beta"} (survival time) or
 #'   \code{"theta"} (quality-adjusted time)
 #' @param times Times at which to evaluate the survival probabilities, on
 #'   the original scale (survival time for \code{beta}, quality-adjusted
 #'   time for \code{theta}). \code{NULL} (default) uses the distinct
 #'   event times of the fit data of each component.
+#' @param tau Restriction time of \code{type = "rmean"}, on the original
+#'   scale: a number, or a vector named by component
+#'   (\code{c(beta = 5, theta = 3)}). \code{NULL} (default) uses the
+#'   largest event time of the fit data of each component.
 #' @param se.fit If TRUE, also returns standard errors (and, for
 #'   \code{type = "survival"}, pointwise confidence limits) from the
 #'   variance replicates of the fit; requires \code{var_comp = TRUE}
@@ -632,7 +704,9 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #' @param ... Not used
 #' @return For \code{type = "lp"}: a vector (one component) or a matrix
 #'   with columns \code{beta} and \code{theta}; with \code{se.fit = TRUE},
-#'   a list with \code{fit} and \code{se.fit} of the same shape. For
+#'   a list with \code{fit} and \code{se.fit} of the same shape. The same
+#'   for \code{type = "rmean"}, with the restriction times in the
+#'   attribute \code{"tau"}. For
 #'   \code{type = "survival"}: a matrix with one row per subject of
 #'   \code{newdata} and one column per time (one component), or a list
 #'   with the matrices \code{beta} and \code{theta}; with
@@ -657,6 +731,7 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #' s <- predict(fit, new, type = "survival", times = c(0.5, 1, 2))
 #' s$beta                                  # P(T > t | z)
 #' s$theta                                 # P(Q > t | z)
+#' predict(fit, new, type = "rmean", tau = 2)  # E[min(T, 2) | z], E[min(Q, 2) | z]
 #'
 #' # Standard errors and pointwise 95% intervals (jackknife replicates)
 #' fit_v <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d,
@@ -666,10 +741,10 @@ print.summary.qast_fit <- function(x, digits = max(3L, getOption("digits") - 3L)
 #'         times = c(0.5, 1), se.fit = TRUE)
 #' @export
 predict.qast_fit <- function(object, newdata = NULL,
-                             type = c("lp", "survival"),
+                             type = c("lp", "survival", "rmean"),
                              component = c("both", "beta", "theta"),
-                             times = NULL, se.fit = FALSE, level = 0.95,
-                             ...) {
+                             times = NULL, tau = NULL, se.fit = FALSE,
+                             level = 0.95, ...) {
   type <- match.arg(type)
   component <- match.arg(component)
   if (is.null(object$resid_dist))
@@ -713,6 +788,40 @@ predict.qast_fit <- function(object, newdata = NULL,
       return(list(fit = out, se.fit = se))
     }
     return(if (length(comps) == 1L) out[, 1L] else out)
+  }
+
+  if (type == "rmean") {
+    links <- lapply(stats::setNames(comps, comps),
+                    function(cp) .qast_link_increasing(object, cp))
+    taus <- vapply(comps, function(cp) .qast_tau(object, cp, tau), numeric(1))
+    rm_of <- function(cp, dist, coef)
+      .qast_rmean(dist, coef, z, cp, links[[cp]], taus[[cp]])
+    out <- vapply(comps, function(cp)
+      rm_of(cp, object$resid_dist[[cp]], object[[cp]]), numeric(nrow(z)))
+    if (!is.matrix(out)) out <- matrix(out, nrow = nrow(z),
+                                       dimnames = list(NULL, comps))
+    rownames(out) <- rownames(z)
+    attr(out, "tau") <- taus
+    if (se.fit) {
+      se <- vapply(comps, function(cp) {
+        vals <- vapply(reps[[cp]], function(r) rm_of(cp, r$dist, r$coef),
+                       numeric(nrow(z)))
+        .qast_rep_se(object, matrix(vals, nrow = nrow(z)))
+      }, numeric(nrow(z)))
+      if (!is.matrix(se)) se <- matrix(se, nrow = nrow(z),
+                                       dimnames = list(NULL, comps))
+      rownames(se) <- rownames(z)
+      if (length(comps) == 1L) {
+        f <- out[, 1L]; attr(f, "tau") <- taus
+        return(list(fit = f, se.fit = se[, 1L]))
+      }
+      return(list(fit = out, se.fit = se))
+    }
+    if (length(comps) == 1L) {
+      f <- out[, 1L]; attr(f, "tau") <- taus
+      return(f)
+    }
+    return(out)
   }
 
   out <- lapply(stats::setNames(comps, comps), function(cp) {

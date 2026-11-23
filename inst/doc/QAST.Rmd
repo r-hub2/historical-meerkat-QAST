@@ -164,6 +164,43 @@ matplot(tg, t(s$theta), type = "s", lty = 1:2, col = 1, ylim = c(0, 1),
 legend("topright", c("trt = 0", "trt = 1"), lty = 1:2, bty = "n")
 ```
 
+`type = "rmean"` gives the mean time restricted to `tau`,
+$E\{\min(T, \tau) \mid z\} = \int_0^\tau S(t \mid z)\,dt$, computed exactly
+on the step curves. The restriction avoids the right tail of the curves,
+which is not identified when the largest times are censored:
+
+```{r rmean}
+predict(fit_prop, new, type = "rmean", tau = 2)
+```
+
+## Predictive performance
+
+`qast_metrics()` measures how well the predicted curves fit the observed
+data: the Brier score over time, the integrated Brier score, the explained
+variation against the model without covariates and the mean absolute error
+of the restricted mean. The usual tools treat `(qtime, status)` as
+right-censored data and weight by the censoring curve of the
+quality-adjusted time, which is biased because that censoring is induced
+informative. `qast_metrics()` weights every subject by the censoring
+survival on the survival time scale, as the estimator of Zhao and Tsiatis
+(1997). It accepts a fit, or a matrix of survival probabilities from any
+model, so different models are compared on the same scale:
+
+```{r metrics}
+train <- d[1:100, ]
+test <- d[101:150, ]
+fit_tr <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = train)
+m <- qast_metrics(fit_tr, newdata = test,
+                  y = with(test, Qsurv(t, qt, status)))
+m
+```
+
+A negative explained variation means that the model predicts the test data
+worse than the curve without covariates, as can happen with weak effects
+and a small test sample. `m$theta$brier` has the Brier score at each time,
+and `ipcw_mass`, close to 1, checks that the follow-up covers the survival
+times (see `?qast_metrics`).
+
 ## Model checking
 
 `qast_pp()` draws the P-P plots of the residuals of Fine and Gelber (2001,

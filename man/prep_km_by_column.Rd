@@ -4,7 +4,7 @@
 \alias{prep_km_by_column}
 \title{Censoring weights of the Fine and Gelber pairs, by column}
 \usage{
-prep_km_by_column(z, t, status, use_legacy = FALSE, group = NULL)
+prep_km_by_column(z, t, status, group = NULL)
 }
 \arguments{
 \item{z}{Binary covariate matrix (n x p)}
@@ -12,8 +12,6 @@ prep_km_by_column(z, t, status, use_legacy = FALSE, group = NULL)
 \item{t}{Observed times}
 
 \item{status}{Event indicator}
-
-\item{use_legacy}{Passed to km_weights_at (reference for the tests)}
 
 \item{group}{Censoring partition: NULL (default; a single group, no
 stratification) or a vector of length n}

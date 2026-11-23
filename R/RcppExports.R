@@ -29,18 +29,6 @@ solve_fg_theta_affine_cpp <- function(aff, rcond = 1e-10) {
     .Call(`_QAST_solve_fg_theta_affine_cpp`, aff, rcond)
 }
 
-compile_fg_pw_cpp <- function(pairs) {
-    .Call(`_QAST_compile_fg_pw_cpp`, pairs)
-}
-
-eval_fg_parts_pw_cpp <- function(pw, lq, z, theta) {
-    .Call(`_QAST_eval_fg_parts_pw_cpp`, pw, lq, z, theta)
-}
-
-eval_fg_obj_pw_cpp <- function(pw, lq, z, theta, norm_min) {
-    .Call(`_QAST_eval_fg_obj_pw_cpp`, pw, lq, z, theta, norm_min)
-}
-
 U2_parts_fg_cpp <- function(theta, lt, lq, z, status, beta, hL, km_surv, phi) {
     .Call(`_QAST_U2_parts_fg_cpp`, theta, lt, lq, z, status, beta, hL, km_surv, phi)
 }

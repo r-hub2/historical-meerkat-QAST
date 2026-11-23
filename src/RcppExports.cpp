@@ -104,46 +104,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// compile_fg_pw_cpp
-Rcpp::List compile_fg_pw_cpp(const Rcpp::List& pairs);
-RcppExport SEXP _QAST_compile_fg_pw_cpp(SEXP pairsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Rcpp::List& >::type pairs(pairsSEXP);
-    rcpp_result_gen = Rcpp::wrap(compile_fg_pw_cpp(pairs));
-    return rcpp_result_gen;
-END_RCPP
-}
-// eval_fg_parts_pw_cpp
-Rcpp::NumericVector eval_fg_parts_pw_cpp(const Rcpp::List& pw, const arma::vec& lq, const arma::mat& z, const arma::vec& theta);
-RcppExport SEXP _QAST_eval_fg_parts_pw_cpp(SEXP pwSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Rcpp::List& >::type pw(pwSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
-    rcpp_result_gen = Rcpp::wrap(eval_fg_parts_pw_cpp(pw, lq, z, theta));
-    return rcpp_result_gen;
-END_RCPP
-}
-// eval_fg_obj_pw_cpp
-double eval_fg_obj_pw_cpp(const Rcpp::List& pw, const arma::vec& lq, const arma::mat& z, const arma::vec& theta, const std::string& norm_min);
-RcppExport SEXP _QAST_eval_fg_obj_pw_cpp(SEXP pwSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP, SEXP norm_minSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const Rcpp::List& >::type pw(pwSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
-    Rcpp::traits::input_parameter< const std::string& >::type norm_min(norm_minSEXP);
-    rcpp_result_gen = Rcpp::wrap(eval_fg_obj_pw_cpp(pw, lq, z, theta, norm_min));
-    return rcpp_result_gen;
-END_RCPP
-}
 // U2_parts_fg_cpp
 Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta, const arma::vec& lt, const arma::vec& lq, const arma::mat& z, const arma::vec& status, const arma::vec& beta, const double hL, const Rcpp::List& km_surv, const std::string& phi);
 RcppExport SEXP _QAST_U2_parts_fg_cpp(SEXP thetaSEXP, SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP, SEXP phiSEXP) {
@@ -304,9 +264,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_QAST_eval_fg_parts_affine_cpp", (DL_FUNC) &_QAST_eval_fg_parts_affine_cpp, 2},
     {"_QAST_eval_fg_obj_affine_cpp", (DL_FUNC) &_QAST_eval_fg_obj_affine_cpp, 3},
     {"_QAST_solve_fg_theta_affine_cpp", (DL_FUNC) &_QAST_solve_fg_theta_affine_cpp, 2},
-    {"_QAST_compile_fg_pw_cpp", (DL_FUNC) &_QAST_compile_fg_pw_cpp, 1},
-    {"_QAST_eval_fg_parts_pw_cpp", (DL_FUNC) &_QAST_eval_fg_parts_pw_cpp, 4},
-    {"_QAST_eval_fg_obj_pw_cpp", (DL_FUNC) &_QAST_eval_fg_obj_pw_cpp, 5},
     {"_QAST_U2_parts_fg_cpp", (DL_FUNC) &_QAST_U2_parts_fg_cpp, 9},
     {"_QAST_U2_obj_fg_cpp", (DL_FUNC) &_QAST_U2_obj_fg_cpp, 10},
     {"_QAST_make_fg_pairs_cpp", (DL_FUNC) &_QAST_make_fg_pairs_cpp, 9},

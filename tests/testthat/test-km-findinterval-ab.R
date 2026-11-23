@@ -1,13 +1,14 @@
 # tests/testthat/test-km-findinterval-ab.R
 #
-# The oracle is the evaluation by which() (.km_weights_at_legacy); the
+# The oracle is the evaluation by which() (km_weights_at_legacy, in
+# helper-references.R); the
 # findInterval path must reproduce it in every edge case. The estimator
 # is survfit in both; what is checked is the evaluation of the step
 # function.
 
 km_compare <- function(t, status, tol = 1e-12) {
   expect_equal(QAST:::km_weights_at(t, status),
-               QAST:::km_weights_at(t, status, use_legacy = TRUE),
+               km_weights_at_legacy(t, status),
                tolerance = tol)
   invisible(TRUE)
 }
@@ -88,8 +89,7 @@ test_that("prep_km_by_column: one weight per subject, from the given partition",
   status <- rbinom(n, 1, 0.75)
   g <- paste(z[, 1], z[, 2])
   km <- QAST:::prep_km_by_column(z, t, status, group = g)
-  km_leg <- QAST:::prep_km_by_column(z, t, status, use_legacy = TRUE,
-                                     group = g)
+  km_leg <- prep_km_by_column_legacy(z, t, status, group = g)
 
   H <- numeric(n)
   for (l in unique(g)) {
@@ -136,8 +136,7 @@ test_that("prep_km_by_column: golden chain - weights feed the FG kernel", {
                                      QAST:::prep_km_by_column(z, t, status),
                                      "identity")
   pairs_leg <- QAST:::make_fg_pairs(lt, lq, z, status, beta, hL,
-                                    QAST:::prep_km_by_column(z, t, status,
-                                                             use_legacy = TRUE),
+                                    prep_km_by_column_legacy(z, t, status),
                                     "identity")
   aff_fast <- QAST:::make_fg_affine(pairs_fast, lq, z)
   aff_leg  <- QAST:::make_fg_affine(pairs_leg, lq, z)

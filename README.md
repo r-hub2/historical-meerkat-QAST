@@ -20,6 +20,7 @@ jackknife ou bootstrap. Os núcleos numéricos são escritos em C++
 | `semi_aft_fg()` | Fine e Gelber (2001) | binárias (0/1) |
 | `surv_qt_fun()` | Estimador de Zhao e Tsiatis (1997) da curva de sobrevivência do tempo ajustado por qualidade | — |
 | `qast_pp()` | P-P plots dos resíduos por grupo, diagnóstico de Fine e Gelber (2001) | grupos discretos |
+| `qast_metrics()` | Brier, Brier integrado, variação explicada e erro absoluto médio, com pesos IPCW válidos para o tempo ajustado por qualidade | qualquer modelo |
 
 Nos dois modelos de regressão, `beta` descreve o tempo de sobrevivência e
 `theta` o tempo ajustado por qualidade.
@@ -105,6 +106,10 @@ fit_prop$intercept        # interceptos: médias dos resíduos
 novo <- data.frame(idade = c(-1, 1), trt = c(1, 0))
 predict(fit_prop, novo)
 predict(fit_prop, novo, type = "survival", times = c(1, 2, 5))
+predict(fit_prop, novo, type = "rmean", tau = 5)   # média restrita a 5
+
+# Desempenho preditivo (Brier e erro absoluto médio com pesos IPCW)
+qast_metrics(fit_prop)
 
 # Diagnóstico: P-P plots dos resíduos por grupo (Fine e Gelber, 2001)
 plot(qast_pp(fit_prop, group = d$idade > 0))
@@ -188,6 +193,7 @@ jackknife or bootstrap. The numerical kernels are written in C++
 | `semi_aft_fg()` | Fine and Gelber (2001) | binary (0/1) |
 | `surv_qt_fun()` | Zhao and Tsiatis (1997) estimator of the quality-adjusted survival curve | — |
 | `qast_pp()` | P-P plots of the residuals by group, Fine and Gelber (2001) diagnostic | discrete groups |
+| `qast_metrics()` | Brier score, integrated Brier score, explained variation and mean absolute error, with IPCW weights valid for the quality-adjusted time | any model |
 
 In both regression models, `beta` describes survival time and `theta` the
 quality-adjusted survival time.
@@ -253,6 +259,10 @@ fit_prop$intercept        # intercepts: means of the residuals
 new <- data.frame(idade = c(-1, 1), trt = c(1, 0))
 predict(fit_prop, new)
 predict(fit_prop, new, type = "survival", times = c(1, 2, 5))
+predict(fit_prop, new, type = "rmean", tau = 5)    # mean restricted to 5
+
+# Predictive performance (Brier score and mean absolute error, IPCW)
+qast_metrics(fit_prop)
 
 # Model checking: P-P plots of the residuals by group (Fine and Gelber, 2001)
 plot(qast_pp(fit_prop, group = d$idade > 0))

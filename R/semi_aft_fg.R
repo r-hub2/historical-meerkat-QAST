@@ -94,7 +94,7 @@
 #'                     L = quantile(d$t, 0.9), var_comp = TRUE))
 #' }
 #' @export
-#' @importFrom stats make.link lm pnorm printCoefmat runif optim cov coef vcov
+#' @importFrom stats make.link lm runif optim coef vcov
 #' @importFrom minqa uobyqa
 #' @importFrom subplex subplex
 #' @importFrom dfoptim mads nmk

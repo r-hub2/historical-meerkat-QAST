@@ -4,7 +4,7 @@
 \alias{km_weights_by_group}
 \title{Censoring KM survival of each subject in its censoring group}
 \usage{
-km_weights_by_group(t, status, group, use_legacy = FALSE)
+km_weights_by_group(t, status, group)
 }
 \arguments{
 \item{t}{Observed times}
@@ -12,8 +12,6 @@ km_weights_by_group(t, status, group, use_legacy = FALSE)
 \item{status}{Event indicator}
 
 \item{group}{Factor with the censoring groups}
-
-\item{use_legacy}{Passed to km_weights_at (reference for the tests)}
 }
 \value{
 Numeric vector of length n

@@ -57,6 +57,17 @@ matplot(tg, t(s$theta), type = "s", lty = 1:2, col = 1, ylim = c(0, 1),
         ylab = "Estimated survival probability")
 legend("topright", c("trt = 0", "trt = 1"), lty = 1:2, bty = "n")
 
+## ----rmean--------------------------------------------------------------------
+predict(fit_prop, new, type = "rmean", tau = 2)
+
+## ----metrics------------------------------------------------------------------
+train <- d[1:100, ]
+test <- d[101:150, ]
+fit_tr <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = train)
+m <- qast_metrics(fit_tr, newdata = test,
+                  y = with(test, Qsurv(t, qt, status)))
+m
+
 ## ----pp, fig.width = 7, fig.height = 3.6--------------------------------------
 pp <- qast_pp(fit_prop, group = cut(d$age, c(-Inf, median(d$age), Inf),
                                     labels = c("younger", "older")))

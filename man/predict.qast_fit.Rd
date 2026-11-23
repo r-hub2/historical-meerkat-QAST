@@ -7,9 +7,10 @@
 \method{predict}{qast_fit}(
   object,
   newdata = NULL,
-  type = c("lp", "survival"),
+  type = c("lp", "survival", "rmean"),
   component = c("both", "beta", "theta"),
   times = NULL,
+  tau = NULL,
   se.fit = FALSE,
   level = 0.95,
   ...
@@ -25,8 +26,9 @@ with the columns of \code{z} (matched by name when the fit had
 column names). \code{NULL} (default) uses the covariates of the fit.}
 
 \item{type}{\code{"lp"} (linear predictor including the intercept,
-\code{intercept + z \%*\% coef}, on the scale of the link) or
-\code{"survival"} (survival probabilities at \code{times})}
+\code{intercept + z \%*\% coef}, on the scale of the link),
+\code{"survival"} (survival probabilities at \code{times}) or
+\code{"rmean"} (mean time restricted to \code{tau})}
 
 \item{component}{\code{"both"}, \code{"beta"} (survival time) or
 \code{"theta"} (quality-adjusted time)}
@@ -35,6 +37,11 @@ column names). \code{NULL} (default) uses the covariates of the fit.}
 the original scale (survival time for \code{beta}, quality-adjusted
 time for \code{theta}). \code{NULL} (default) uses the distinct
 event times of the fit data of each component.}
+
+\item{tau}{Restriction time of \code{type = "rmean"}, on the original
+scale: a number, or a vector named by component
+(\code{c(beta = 5, theta = 3)}). \code{NULL} (default) uses the
+largest event time of the fit data of each component.}
 
 \item{se.fit}{If TRUE, also returns standard errors (and, for
 \code{type = "survival"}, pointwise confidence limits) from the
@@ -47,7 +54,9 @@ variance replicates of the fit; requires \code{var_comp = TRUE}}
 \value{
 For \code{type = "lp"}: a vector (one component) or a matrix
   with columns \code{beta} and \code{theta}; with \code{se.fit = TRUE},
-  a list with \code{fit} and \code{se.fit} of the same shape. For
+  a list with \code{fit} and \code{se.fit} of the same shape. The same
+  for \code{type = "rmean"}, with the restriction times in the
+  attribute \code{"tau"}. For
   \code{type = "survival"}: a matrix with one row per subject of
   \code{newdata} and one column per time (one component), or a list
   with the matrices \code{beta} and \code{theta}; with
@@ -98,6 +107,16 @@ variance. The survival intervals are pointwise: normal
 jackknife, percentile for the bootstrap, truncated to [0, 1]. The
 censoring weights are re-estimated in every replicate, as in the
 variance of the coefficients.
+
+\code{type = "rmean"} gives the restricted mean
+\eqn{\int_0^\tau S(t \mid z)\,dt = E\{\min(T, \tau) \mid z\}}{int_0^tau
+S(t | z) dt = E[min(T, tau) | z]} (and the same for the quality-adjusted
+time), computed exactly on the step curve of each subject: the curves
+are steps between the jumps \eqn{h^{-1}(v_j + z^\top\hat\beta)}{h^-1(v_j
++ z'beta)}, \eqn{v_j} the residuals. The unrestricted mean is not used
+because the right tail of the curves is not identified when the
+largest times are censored. It requires an increasing link (such as
+the default \code{"log"}).
 }
 \examples{
 set.seed(1)
@@ -113,6 +132,7 @@ predict(fit, new)                       # linear predictors
 s <- predict(fit, new, type = "survival", times = c(0.5, 1, 2))
 s$beta                                  # P(T > t | z)
 s$theta                                 # P(Q > t | z)
+predict(fit, new, type = "rmean", tau = 2)  # E[min(T, 2) | z], E[min(Q, 2) | z]
 
 # Standard errors and pointwise 95\% intervals (jackknife replicates)
 fit_v <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d,

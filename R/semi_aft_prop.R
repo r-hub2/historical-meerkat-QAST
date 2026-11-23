@@ -69,7 +69,7 @@
 #' fit <- semi_aft_prop(Qsurv(t, qt, status) ~ age + trt, data = d)
 #' fit
 #' @export
-#' @importFrom stats make.link lm pnorm printCoefmat runif optim cov coef vcov
+#' @importFrom stats make.link lm runif optim coef vcov
 #' @importFrom survival coxph Surv
 #' @importFrom minqa uobyqa
 #' @importFrom subplex subplex

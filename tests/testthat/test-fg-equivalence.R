@@ -37,7 +37,7 @@ test_that("U2 components: C++ kernel equals the R reference", {
         
         parts_cpp <- QAST:::U2_parts_fg_cpp(theta, lt, lq, z, status,
                                             beta, hL, km_surv, phi)
-        parts_ref <- QAST:::U2_parts_fg_ref(theta, lt, lq, z, status,
+        parts_ref <- U2_parts_fg_ref(theta, lt, lq, z, status,
                                             beta, hL, km_surv, phi)
         expect_equal(parts_cpp, parts_ref, tolerance = 1e-10)
         

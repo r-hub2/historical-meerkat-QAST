@@ -4,15 +4,12 @@
 \alias{km_weights_at}
 \title{Kaplan-Meier censoring survival at each subject's observed time}
 \usage{
-km_weights_at(t, status, use_legacy = FALSE)
+km_weights_at(t, status)
 }
 \arguments{
 \item{t}{Observed times of the group}
 
 \item{status}{Event indicator (1 = event)}
-
-\item{use_legacy}{If TRUE, evaluates with \code{which()} (reference
-implementation for the A/B tests)}
 }
 \value{
 Vector of length \code{length(t)} with \code{S_cens(t_i)}
@@ -20,7 +17,7 @@ Vector of length \code{length(t)} with \code{S_cens(t_i)}
 \description{
 The censoring KM curve is estimated by \code{survival::survfit} and the
 step function is evaluated at each \code{t[i]} with \code{findInterval}
-(O(n log m) per group).
+(O(n log m)).
 }
 \details{
 Conventions (checked by the tests):

@@ -4,11 +4,16 @@ S3method(coef,qast_fit)
 S3method(plot,qast_pp)
 S3method(predict,qast_fit)
 S3method(print,qast_fit)
+S3method(print,qast_metrics)
+S3method(print,qast_metrics_list)
 S3method(print,qast_pp)
 S3method(print,summary.qast_fit)
+S3method(qast_metrics,default)
+S3method(qast_metrics,qast_fit)
 S3method(summary,qast_fit)
 S3method(vcov,qast_fit)
 export(Qsurv)
+export(qast_metrics)
 export(qast_pp)
 export(semi_aft_fg)
 export(semi_aft_prop)
@@ -23,13 +28,10 @@ importFrom(minqa,uobyqa)
 importFrom(optimx,optimr)
 importFrom(stats,
   coef,
-  cov,
   lm,
   make.link,
   optim,
-  pnorm,
   predict,
-  printCoefmat,
   runif,
   vcov
 )

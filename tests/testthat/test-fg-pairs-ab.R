@@ -47,7 +47,7 @@ test_that("Pairs (identity): equal the legacy kernel and the reference on a grid
       expect_equal(parts_new, parts_leg, tolerance = 1e-10)
       
       # Triangulation: reference kernel vs pure R reference
-      parts_ref <- QAST:::U2_parts_fg_ref(theta, cas$lt, cas$lq,
+      parts_ref <- U2_parts_fg_ref(theta, cas$lt, cas$lq,
                                           cas$z, cas$status, beta,
                                           cas$hL, km, "identity")
       expect_equal(parts_leg, parts_ref, tolerance = 1e-10)
@@ -204,7 +204,6 @@ test_that("PERF-1: identity stores no pairs; Ra/Cb bit-identical to piecewise", 
     # An identity object refuses the piecewise evaluation (never a silent zero)
     expect_error(QAST:::eval_fg_parts_cpp(p_id, cas$lq, cas$z, c(0, 0),
                                           "piecewise"), "identity")
-    expect_error(QAST:::compile_fg_pw_cpp(p_id), "identity")
   }
 })
 
@@ -261,7 +260,7 @@ test_that("semi_aft_fg: piecewise and fast_path paths run (regression B1/B2)", {
   fit_pw <- do.call(semi_aft_fg, c(args, phi = "piecewise"))
   km  <- QAST:::prep_km_by_column(cas$z, cas$t, cas$status)
   b   <- unname(fit_pw$beta)
-  f_leg <- function(th) QAST:::U2_fun_fg_cpp(th, cas$lq, cas$lt, cas$z,
+  f_leg <- function(th) QAST:::U2_obj_fg_cpp(th, cas$lt, cas$lq, cas$z,
                                              cas$status, b, cas$hL, km,
                                              "piecewise", "L2")
   th0 <- unname(stats::lm(cas$lq ~ cas$z)$coef[-1])

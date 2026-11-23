@@ -20,7 +20,7 @@ expect_fg_equivalent <- function(theta, lt, lq, z, status, beta, hL,
                                  km_surv, phi, norm_min, tol = 1e-10) {
   parts_cpp <- QAST:::U2_parts_fg_cpp(theta, lt, lq, z, status,
                                       beta, hL, km_surv, phi)
-  parts_ref <- QAST:::U2_parts_fg_ref(theta, lt, lq, z, status,
+  parts_ref <- U2_parts_fg_ref(theta, lt, lq, z, status,
                                       beta, hL, km_surv, phi)
   expect_equal(parts_cpp, parts_ref, tolerance = tol)
   
