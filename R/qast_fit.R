@@ -125,13 +125,15 @@ Qsurv <- function(time, qtime, status) {
   invisible(TRUE)
 }
 
-# Methods that do not accept a single coefficient (dfoptim::nmk and mads
-# call optimize(); minqa::uobyqa/bobyqa and hjkb do not converge with
-# p = 1): with one covariate, use subplex, also derivative-free.
+# Methods not used with a single coefficient: dfoptim::nmk and mads call
+# optimize(), minqa::uobyqa and hjkb do not converge with p = 1, and the
+# BOBYQA of NLopt stops early on the steps of the rank estimating
+# functions (worse than subplex in 9 of 20 simulated fits). With one
+# covariate, use subplex, also derivative-free.
 .qast_method_for_p <- function(method, p) {
   if (p == 1L && method %in% c("Nelder-Mead", "uobyqa", "mads", "bobyqa",
                                "hjkb")) {
-    message(sprintf(paste0("method = \"%s\" does not support a single coefficient; ",
+    message(sprintf(paste0("method = \"%s\" is not used with a single coefficient; ",
                            "using \"subplex\"."), method))
     return("subplex")
   }

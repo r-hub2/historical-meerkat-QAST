@@ -16,7 +16,6 @@ Rcpp::IntegerVector aft_order_desc_cpp(const arma::vec& e, const std::string& me
 RcppExport SEXP _QAST_aft_order_desc_cpp(SEXP eSEXP, SEXP methodSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type e(eSEXP);
     Rcpp::traits::input_parameter< const std::string& >::type method(methodSEXP);
     rcpp_result_gen = Rcpp::wrap(aft_order_desc_cpp(e, method));
@@ -28,7 +27,6 @@ double U1_obj_cpp(const arma::vec& par, const arma::vec& lt, const arma::mat& z,
 RcppExport SEXP _QAST_U1_obj_cpp(SEXP parSEXP, SEXP ltSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type par(parSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -43,7 +41,6 @@ double U2_obj_cpp(const arma::vec& par, const arma::vec& lq, const arma::mat& z,
 RcppExport SEXP _QAST_U2_obj_cpp(SEXP parSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP HG_survSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type par(parSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -59,7 +56,6 @@ Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs, const arma::vec& lq, cons
 RcppExport SEXP _QAST_make_fg_affine_cpp(SEXP pairsSEXP, SEXP lqSEXP, SEXP zSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type pairs(pairsSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -72,7 +68,6 @@ Rcpp::NumericVector eval_fg_parts_affine_cpp(const Rcpp::List& aff, const arma::
 RcppExport SEXP _QAST_eval_fg_parts_affine_cpp(SEXP affSEXP, SEXP thetaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type aff(affSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
     rcpp_result_gen = Rcpp::wrap(eval_fg_parts_affine_cpp(aff, theta));
@@ -84,7 +79,6 @@ double eval_fg_obj_affine_cpp(const Rcpp::List& aff, const arma::vec& theta, con
 RcppExport SEXP _QAST_eval_fg_obj_affine_cpp(SEXP affSEXP, SEXP thetaSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type aff(affSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
     Rcpp::traits::input_parameter< const std::string& >::type norm_min(norm_minSEXP);
@@ -97,7 +91,6 @@ Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff, const double rcond);
 RcppExport SEXP _QAST_solve_fg_theta_affine_cpp(SEXP affSEXP, SEXP rcondSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type aff(affSEXP);
     Rcpp::traits::input_parameter< const double >::type rcond(rcondSEXP);
     rcpp_result_gen = Rcpp::wrap(solve_fg_theta_affine_cpp(aff, rcond));
@@ -109,7 +102,6 @@ Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta, const arma::vec& lt,
 RcppExport SEXP _QAST_U2_parts_fg_cpp(SEXP thetaSEXP, SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP, SEXP phiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
@@ -128,7 +120,6 @@ double U2_obj_fg_cpp(const arma::vec& theta, const arma::vec& lt, const arma::ve
 RcppExport SEXP _QAST_U2_obj_fg_cpp(SEXP thetaSEXP, SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP, SEXP phiSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type theta(thetaSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
@@ -148,7 +139,6 @@ Rcpp::List make_fg_pairs_cpp(const arma::vec& lt, const arma::vec& lq, const arm
 RcppExport SEXP _QAST_make_fg_pairs_cpp(SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP, SEXP phiSEXP, SEXP algoSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -167,7 +157,6 @@ Rcpp::NumericVector eval_fg_parts_cpp(const Rcpp::List& pairs, const arma::vec& 
 RcppExport SEXP _QAST_eval_fg_parts_cpp(SEXP pairsSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP, SEXP phiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type pairs(pairsSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -182,7 +171,6 @@ double eval_fg_obj_cpp(const Rcpp::List& pairs, const arma::vec& lq, const arma:
 RcppExport SEXP _QAST_eval_fg_obj_cpp(SEXP pairsSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP, SEXP phiSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type pairs(pairsSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -198,7 +186,6 @@ Rcpp::List make_fg_pw_lean_cpp(const arma::vec& lt, const arma::vec& lq, const a
 RcppExport SEXP _QAST_make_fg_pw_lean_cpp(SEXP ltSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP statusSEXP, SEXP betaSEXP, SEXP hLSEXP, SEXP km_survSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::vec& >::type lt(ltSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -215,7 +202,6 @@ Rcpp::NumericVector eval_fg_parts_pw_lean_cpp(const Rcpp::List& lean, const arma
 RcppExport SEXP _QAST_eval_fg_parts_pw_lean_cpp(SEXP leanSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type lean(leanSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -229,7 +215,6 @@ double eval_fg_obj_pw_lean_cpp(const Rcpp::List& lean, const arma::vec& lq, cons
 RcppExport SEXP _QAST_eval_fg_obj_pw_lean_cpp(SEXP leanSEXP, SEXP lqSEXP, SEXP zSEXP, SEXP thetaSEXP, SEXP norm_minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const Rcpp::List& >::type lean(leanSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lq(lqSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
@@ -244,7 +229,6 @@ NumericVector surv_qt_with_km_cpp(const NumericVector& qaly, const NumericVector
 RcppExport SEXP _QAST_surv_qt_with_km_cpp(SEXP qalySEXP, SEXP timeSEXP, SEXP statusSEXP, SEXP km_timeSEXP, SEXP km_survSEXP, SEXP lin_predSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericVector& >::type qaly(qalySEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type time(timeSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type status(statusSEXP);

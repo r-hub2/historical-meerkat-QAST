@@ -34,9 +34,12 @@
 #' @param h2 Link function for \code{qt} (default \code{"log"})
 #' @param method Optimizer: "Nelder-Mead" (default), "uobyqa", "mads",
 #'   "subplex", "BB", "SANN", "bobyqa", "newuoa", "hjkb", "BFGS". With a
-#'   single covariate, methods that do not support one coefficient
-#'   (Nelder-Mead, uobyqa, mads, bobyqa, hjkb) are replaced by "subplex",
-#'   with a message
+#'   single covariate, methods that do not support one coefficient or
+#'   perform poorly with it (Nelder-Mead, uobyqa, mads, bobyqa, hjkb) are
+#'   replaced by "subplex",
+#'   with a message. "bobyqa" uses the BOBYQA of NLopt (package nloptr)
+#'   rather than the one of minqa, whose RESCUE step evaluates the function
+#'   at an uninitialized point (minqa 1.2.8)
 #' @param norm_min Minimization norm, \code{"L2"} (default) or \code{"L1"}
 #' @param L Truncation time for the quality-adjusted parameters (required,
 #'   positive)
@@ -193,7 +196,10 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
                                     control = list(trace = FALSE),
                                     quiet = TRUE),
            "SANN"         = optim(par = par, fn = fn, method = "SANN"),
-           "bobyqa" = ,
+           # BOBYQA of NLopt (nloptr): the minqa one evaluates the function at an
+           # uninitialized point in its RESCUE step (src/rescue.f, minqa 1.2.8)
+           "bobyqa"       = nloptr::bobyqa(x0 = par, fn = fn,
+                                           control = list(maxeval = 10000)),
            "newuoa" = ,
            "hjkb"   = ,
            "BFGS"   = optimr(par = par, fn = fn, method = method,
@@ -206,6 +212,9 @@ semi_aft_fg <- function(t, qt, status, z, h1 = "log", h2 = "log",
     if (method == "uobyqa") return(res$ierr)
     cc <- res$convergence
     if (method == "mads") cc <- if (cc < 1e-06) 0 else -1
+    # NLopt status: 1-4 = converged (tolerances met); 5-6 = evaluation or
+    # time limit; negative = failure
+    if (method == "bobyqa") cc <- if (cc %in% 1:4) 0 else -1
     cc
   }
   

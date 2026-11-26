@@ -78,16 +78,15 @@ tau)]}, one per subject, for the mean absolute error. \code{NULL}
 \value{
 An object of class \code{"qast_metrics"}: a list with
   \code{brier} (data frame with \code{time}, \code{brier},
-  \code{brier_null} and \code{r2}), \code{ibs}, \code{ibs_null},
-  \code{r2_ibs}, \code{mae}, \code{tau}, \code{n}, \code{n_events},
+  \code{brier_null}), \code{ibs}, \code{ibs_null}, \code{mae}, \code{tau}, \code{n}, \code{n_events},
   \code{ipcw_mass} (see Details) and \code{pred_time} (predicted
   restricted means, \code{NULL} if not given). For a \code{"qast_fit"}
   with \code{component = "both"}, a list of two such objects
   (\code{beta} and \code{theta}) of class \code{"qast_metrics_list"}.
 }
 \description{
-Brier score, integrated Brier score, explained variation against the
-null model and mean absolute error of the predicted curves of the
+Brier score, integrated Brier score (with those of the null model) and
+mean absolute error of the predicted curves of the
 survival time (\eqn{T}) or of the quality-adjusted survival time
 (\eqn{Q}), with inverse probability of censoring weights (IPCW) that are
 valid for \eqn{Q}.
@@ -119,9 +118,8 @@ covariates:
     its quality path, so it cannot be reweighted.
 }
 The null model is the curve without covariates: the Kaplan-Meier curve
-of \eqn{T}, or the Zhao and Tsiatis curve of \eqn{Q}. \code{r2} is
-\eqn{1 - BS/BS_{null}}{1 - BS / BS_null} at each time and \code{r2_ibs}
-the same for the integrated scores. The integrated Brier score is the
+of \eqn{T}, or the Zhao and Tsiatis curve of \eqn{Q}; its scores are a
+reference for those of the model. The integrated Brier score is the
 trapezoidal integral over the grid \code{times}, divided by its range.
 
 The weights require positivity: every survival time must have a
@@ -159,7 +157,7 @@ m
 head(m$theta$brier)
 
 # Any model, from its survival matrix: here, the Kaplan-Meier curve
-# without covariates (the null model, explained variation 0)
+# without covariates (the null model: the same scores as the reference)
 library(survival)
 km <- survfit(Surv(t, status) ~ 1, data = train)
 tt <- sort(unique(test$t[test$status == 1]))

@@ -40,9 +40,9 @@ First release.
   lack-of-fit diagnostic of Fine and Gelber (2001, Section 4), with the
   trimmed conditional quality-adjusted distribution for `semi_aft_fg()`
   fits; `print()` and `plot()` methods.
-* `qast_metrics()`: Brier score over time, integrated Brier score,
-  explained variation against the model without covariates and IPCW mean
-  absolute error of the restricted mean, for a fit or for a matrix of
+* `qast_metrics()`: Brier score over time and integrated Brier score
+  (with those of the model without covariates as a reference) and IPCW
+  mean absolute error of the restricted mean, for a fit or for a matrix of
   survival probabilities from any model. For the quality-adjusted time,
   whose censoring is induced informative, the weights use the censoring
   survival on the survival time scale, as the estimator of Zhao and
@@ -81,10 +81,17 @@ First release.
   estimating equations are invariant to shifts; linearly dependent columns
   trigger a warning.
 * With a single covariate, optimizers that do not support one coefficient
-  are replaced by `"subplex"`, with a message.
+  or perform poorly with it are replaced by `"subplex"`, with a message.
 
 ## Computation
 
+* The C++ kernels are exported with `rng = false`: they do not use the R
+  random number generator, and the default `RNGScope` of the wrappers
+  reloaded `.Random.seed` at every call, which restarted the random walk
+  of `method = "SANN"` at each evaluation of the objective.
+* `method = "bobyqa"` uses the BOBYQA of NLopt (package nloptr) instead of
+  the one of minqa, whose RESCUE step evaluates the function at an
+  uninitialized point (minqa 1.2.8, `src/rescue.f`).
 * Estimating equations evaluated by C++ kernels (Rcpp/RcppArmadillo).
 * In `semi_aft_fg()` with `phi = "piecewise"`, the objective is evaluated
   without storing the pairs: O(n) memory and O(n log^2 n) per evaluation,

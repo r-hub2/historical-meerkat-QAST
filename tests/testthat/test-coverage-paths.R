@@ -81,3 +81,40 @@ test_that(".qast_workers honors the QAST.cores option and the check limit", {
   options(QAST.cores = 0L)
   expect_identical(QAST:::.qast_workers(), 1L)
 })
+
+test_that("C++ kernels do not touch the R random number generator", {
+  # With an RNGScope in the wrappers, every call reloaded .Random.seed and
+  # optim(method = "SANN") restarted its random walk at each evaluation.
+  d <- mk_cov_data(n = 80)
+  lt <- log(d$t); st <- as.numeric(d$status); z <- d$x * 1
+  visited <- function(fn) {
+    pts <- list()
+    g <- function(b) { pts[[length(pts) + 1L]] <<- b; fn(b) }
+    set.seed(7)
+    stats::optim(c(0, 0), g, method = "SANN", control = list(maxit = 200))
+    do.call(rbind, pts)
+  }
+  target <- function(b) sum((b - c(0.5, -0.2))^2)
+  with_cpp <- function(b) {
+    QAST:::U1_obj_cpp(b, lt, z, st, "L2")
+    target(b)
+  }
+  expect_identical(visited(with_cpp), visited(target))
+  # and a call leaves the stream where it was
+  set.seed(3); a <- runif(1)
+  set.seed(3); QAST:::U1_obj_cpp(c(0, 0), lt, z, st, "L2"); b <- runif(1)
+  expect_identical(a, b)
+})
+
+test_that("bobyqa uses NLopt, not minqa", {
+  d <- mk_cov_data(n = 80)
+  testthat::local_mocked_bindings(
+    bobyqa = function(...) stop("minqa::bobyqa called"), .package = "minqa"
+  )
+  fit <- semi_aft_prop(d$t, d$qt, d$status, d$x, method = "bobyqa")
+  expect_true(all(is.finite(c(fit$beta, fit$theta))))
+  ref <- semi_aft_prop(d$t, d$qt, d$status, d$x)
+  expect_equal(fit$beta, ref$beta, tolerance = 0.1)
+  fg <- semi_aft_fg(d$t, d$qt, d$status, d$z, L = d$L, method = "bobyqa")
+  expect_true(all(is.finite(c(fg$beta, fg$theta))))
+})

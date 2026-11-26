@@ -84,7 +84,7 @@ test_that("without censoring the metrics are the plain averages", {
   }
 })
 
-test_that("the null model has explained variation 0", {
+test_that("the null model reproduces the reference scores", {
   d <- mk_met_data()
   y <- with(d, Qsurv(t, qt, status))
   n <- nrow(d)
@@ -94,7 +94,8 @@ test_that("the null model has explained variation 0", {
   S <- matrix(summary(km, times = tt)$surv, n, length(tt), byrow = TRUE)
   m <- qast_metrics(S, y = y, times = tt)
   expect_equal(m$brier$brier, m$brier$brier_null)
-  expect_equal(m$r2_ibs, 0)
+  expect_equal(m$ibs, m$ibs_null)
+  expect_false(any(c("r2", "r2_ibs") %in% c(names(m), names(m$brier))))
   # without predicted means, no mean absolute error
   expect_true(is.na(m$mae))
   expect_null(m$pred_time)

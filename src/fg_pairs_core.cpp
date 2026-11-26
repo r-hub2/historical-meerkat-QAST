@@ -317,7 +317,7 @@ inline bool marginals_cdq(const double hL,
 //
 // Returns: list per column + attr "meta" (see the schema in the header);
 // meta$cdq_cols tells, per column, whether the CDQ path was used.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List make_fg_pairs_cpp(const arma::vec& lt,
                              const arma::vec& lq,
                              const arma::mat& z,
@@ -567,7 +567,7 @@ arma::vec eval_parts(const Rcpp::List& pairs,
 //
 // Components of the U-statistic from the pairs object.
 // Returns a numeric vector of length p without a dim attribute.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector eval_fg_parts_cpp(const Rcpp::List& pairs,
                                       const arma::vec& lq,
                                       const arma::mat& z,
@@ -581,7 +581,7 @@ Rcpp::NumericVector eval_fg_parts_cpp(const Rcpp::List& pairs,
 //
 // Norm (L1/L2) of the components, standardized by sqrt(p). Interface
 // compatible with U2_fun_fg_cpp for the A/B tests.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double eval_fg_obj_cpp(const Rcpp::List& pairs,
                        const arma::vec& lq,
                        const arma::mat& z,
@@ -775,7 +775,7 @@ inline LeanCol lean_from_list(const Rcpp::List& col) {
 // Piecewise object without pairs: per column, the active members (ia/A/u/wa
 // in group 0, ib/B/v/wb in group 1). attr "meta": p, n2 and ok (FALSE
 // if some column needs the fallback to the explicit pairs).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List make_fg_pw_lean_cpp(const arma::vec& lt,
                                const arma::vec& lq,
                                const arma::mat& z,
@@ -829,7 +829,7 @@ Rcpp::List make_fg_pw_lean_cpp(const arma::vec& lt,
 
 // eval_fg_parts_pw_lean_cpp: piecewise components from the object
 // without pairs
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector eval_fg_parts_pw_lean_cpp(const Rcpp::List& lean,
                                               const arma::vec& lq,
                                               const arma::mat& z,
@@ -851,7 +851,7 @@ Rcpp::NumericVector eval_fg_parts_pw_lean_cpp(const Rcpp::List& lean,
 }
 
 // eval_fg_obj_pw_lean_cpp: norm (L1/L2) of the components, by sqrt(p)
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double eval_fg_obj_pw_lean_cpp(const Rcpp::List& lean,
                                const arma::vec& lq,
                                const arma::mat& z,

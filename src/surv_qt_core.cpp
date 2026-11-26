@@ -177,7 +177,7 @@ NumericVector surv_qt_cpp(const NumericVector& qaly,
 //   lin_pred  - optional: linear predictor (X %*% theta)
 //
 // Returns a numeric vector of length n.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 NumericVector surv_qt_with_km_cpp(const NumericVector& qaly,
                                   const NumericVector& time,
                                   const NumericVector& status,

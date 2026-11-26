@@ -44,9 +44,12 @@ are rejected, since the model does not estimate an intercept}
 
 \item{method}{Optimizer: "Nelder-Mead" (default), "uobyqa", "mads",
 "subplex", "BB", "SANN", "bobyqa", "newuoa", "hjkb", "BFGS". With a
-single covariate, methods that do not support one coefficient
-(Nelder-Mead, uobyqa, mads, bobyqa, hjkb) are replaced by "subplex",
-with a message}
+single covariate, methods that do not support one coefficient or
+perform poorly with it (Nelder-Mead, uobyqa, mads, bobyqa, hjkb) are
+replaced by "subplex",
+with a message. "bobyqa" uses the BOBYQA of NLopt (package nloptr)
+rather than the one of minqa, whose RESCUE step evaluates the function
+at an uninitialized point (minqa 1.2.8)}
 
 \item{norm_min}{Minimization norm, \code{"L2"} (default) or \code{"L1"}}
 

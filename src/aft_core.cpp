@@ -82,7 +82,7 @@ inline arma::uvec stable_order_desc(const arma::vec& e) {
 }
 
 // Exported only for the tests of the sort
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::IntegerVector aft_order_desc_cpp(const arma::vec& e,
                                        const std::string& method = "radix") {
   const arma::uvec o = (method == "arma")
@@ -102,7 +102,7 @@ Rcpp::IntegerVector aft_order_desc_cpp(const arma::vec& e,
 // Swapping the order of the sum, C' d = sum_k Zs[k,] * R[k], R[k] = sum_{r>=k} d[r],
 // so U = z' v with v[ord[r]] = d[r] * S0[r] - R[r] / n.
 // -----------------------------------------------------------------------------
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double U1_obj_cpp(const arma::vec& par,
                   const arma::vec& lt,
                   const arma::mat& z,
@@ -142,7 +142,7 @@ double U1_obj_cpp(const arma::vec& par,
 //   U = sum_r ws[r] * ((cw[r] / n) * Zs[r,] - Cw[r,] / n) = z' v,
 //   v[ord[r]] = ws[r] * cw[r] / n - ws[r] * Rw[r] / n,  Rw[r] = sum_{k>=r} ws[k]
 // -----------------------------------------------------------------------------
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double U2_obj_cpp(const arma::vec& par,
                   const arma::vec& lq,
                   const arma::mat& z,

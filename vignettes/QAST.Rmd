@@ -188,8 +188,8 @@ predict(fit_prop, new, type = "rmean", tau = 2)
 ## Predictive performance
 
 `qast_metrics()` measures how well the predicted curves fit the observed
-data: the Brier score over time, the integrated Brier score, the explained
-variation against the model without covariates and the mean absolute error
+data: the Brier score over time and the integrated Brier score, with those
+of the model without covariates as a reference, and the mean absolute error
 of the restricted mean. The usual tools treat `(qtime, status)` as
 right-censored data and weight by the censoring curve of the
 quality-adjusted time, which is biased because that censoring is induced
@@ -207,9 +207,9 @@ m <- qast_metrics(fit_tr, newdata = test,
 m
 ```
 
-A negative explained variation means that the model predicts the test data
-worse than the curve without covariates, as can happen with weak effects
-and a small test sample. `m$theta$brier` has the Brier score at each time,
+Lower scores are better. A model can score worse than the curve without
+covariates on test data, as can happen with weak effects and a small test
+sample. `m$theta$brier` has the Brier score at each time,
 and `ipcw_mass`, close to 1, checks that the follow-up covers the survival
 times (see `?qast_metrics`).
 

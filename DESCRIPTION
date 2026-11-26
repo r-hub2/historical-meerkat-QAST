@@ -28,14 +28,14 @@ BugReports: https://codeberg.org/landsilva/QAST/issues
 Encoding: UTF-8
 Depends: R (>= 4.1.0)
 Imports: graphics, stats, survival, minqa, subplex, dfoptim, optimx,
-        BB, parallel, Rcpp
+        BB, nloptr, parallel, Rcpp
 LinkingTo: Rcpp, RcppArmadillo
 Suggests: jackknifeR, knitr, rmarkdown, testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1
 NeedsCompilation: yes
-Packaged: 2026-11-23 20:42:21 UTC; alan
+Packaged: 2026-11-26 03:58:51 UTC; alan
 Author: Alan da Silva [aut, cre] (ORCID:
     <https://orcid.org/0000-0001-9674-9830>),
   Gisela Tunes da Silva [aut] (ORCID:

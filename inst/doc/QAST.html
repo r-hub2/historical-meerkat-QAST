@@ -581,16 +581,16 @@ not identified when the largest times are censored:</p>
 <div id="predictive-performance" class="section level2">
 <h2>Predictive performance</h2>
 <p><code>qast_metrics()</code> measures how well the predicted curves
-fit the observed data: the Brier score over time, the integrated Brier
-score, the explained variation against the model without covariates and
-the mean absolute error of the restricted mean. The usual tools treat
-<code>(qtime, status)</code> as right-censored data and weight by the
-censoring curve of the quality-adjusted time, which is biased because
-that censoring is induced informative. <code>qast_metrics()</code>
-weights every subject by the censoring survival on the survival time
-scale, as the estimator of Zhao and Tsiatis (1997). It accepts a fit, or
-a matrix of survival probabilities from any model, so different models
-are compared on the same scale:</p>
+fit the observed data: the Brier score over time and the integrated
+Brier score, with those of the model without covariates as a reference,
+and the mean absolute error of the restricted mean. The usual tools
+treat <code>(qtime, status)</code> as right-censored data and weight by
+the censoring curve of the quality-adjusted time, which is biased
+because that censoring is induced informative.
+<code>qast_metrics()</code> weights every subject by the censoring
+survival on the survival time scale, as the estimator of Zhao and
+Tsiatis (1997). It accepts a fit, or a matrix of survival probabilities
+from any model, so different models are compared on the same scale:</p>
 <div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>train <span class="ot">&lt;-</span> d[<span class="dv">1</span><span class="sc">:</span><span class="dv">100</span>, ]</span>
 <span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>test <span class="ot">&lt;-</span> d[<span class="dv">101</span><span class="sc">:</span><span class="dv">150</span>, ]</span>
 <span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>fit_tr <span class="ot">&lt;-</span> <span class="fu">semi_aft_prop</span>(<span class="fu">Qsurv</span>(t, qt, status) <span class="sc">~</span> age <span class="sc">+</span> trt, <span class="at">data =</span> train)</span>
@@ -599,20 +599,18 @@ are compared on the same scale:</p>
 <span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>m</span>
 <span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt; Predictive performance: survival time (n = 50, 35 events)</span></span>
 <span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt;   Integrated Brier score over [0.01255, 3.919]: 0.1662 (null model 0.1624)</span></span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt;   Explained variation (1 - IBS / IBS null): -0.0238</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt;   Mean absolute error of min(Y, 3.919): 0.9299</span></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co">#&gt;   IPCW weights: censoring Kaplan-Meier on the survival time scale (total mass 0.9343)</span></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt; Predictive performance: quality-adjusted survival time (n = 50, 35 events)</span></span>
-<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#&gt;   Integrated Brier score over [0.0109, 3.854]: 0.1068 (null model 0.1049)</span></span>
-<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co">#&gt;   Explained variation (1 - IBS / IBS null): -0.01867</span></span>
-<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a><span class="co">#&gt;   Mean absolute error of min(Y, 3.854): 0.7102</span></span>
-<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a><span class="co">#&gt;   IPCW weights: censoring Kaplan-Meier on the survival time scale (total mass 0.9343)</span></span></code></pre></div>
-<p>A negative explained variation means that the model predicts the test
-data worse than the curve without covariates, as can happen with weak
-effects and a small test sample. <code>m$theta$brier</code> has the
-Brier score at each time, and <code>ipcw_mass</code>, close to 1, checks
-that the follow-up covers the survival times (see
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt;   Mean absolute error of min(Y, 3.919): 0.9299</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a><span class="co">#&gt;   IPCW weights: censoring Kaplan-Meier on the survival time scale (total mass 0.9343)</span></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="co">#&gt; Predictive performance: quality-adjusted survival time (n = 50, 35 events)</span></span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt;   Integrated Brier score over [0.0109, 3.854]: 0.1068 (null model 0.1049)</span></span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a><span class="co">#&gt;   Mean absolute error of min(Y, 3.854): 0.7102</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co">#&gt;   IPCW weights: censoring Kaplan-Meier on the survival time scale (total mass 0.9343)</span></span></code></pre></div>
+<p>Lower scores are better. A model can score worse than the curve
+without covariates on test data, as can happen with weak effects and a
+small test sample. <code>m$theta$brier</code> has the Brier score at
+each time, and <code>ipcw_mass</code>, close to 1, checks that the
+follow-up covers the survival times (see
 <code>?qast_metrics</code>).</p>
 </div>
 <div id="model-checking" class="section level2">

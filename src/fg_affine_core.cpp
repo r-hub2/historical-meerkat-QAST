@@ -93,7 +93,7 @@ inline double norm_aggregate(const arma::vec& parts,
 //   z     - binary covariate matrix (n x p)
 //
 // Returns List(alpha = vec p, W = mat p x p) with the meta propagated.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs,
                               const arma::vec& lq,
                               const arma::mat& z) {
@@ -149,7 +149,7 @@ Rcpp::List make_fg_affine_cpp(const Rcpp::List& pairs,
 //
 // Components in the affine form: parts(theta) = alpha + W * theta.
 // O(p^2). Returns an R vector without a dim attribute (converted at the boundary).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector eval_fg_parts_affine_cpp(const Rcpp::List& aff,
                                              const arma::vec& theta) {
   const arma::vec alpha = Rcpp::as<arma::vec>(aff["alpha"]);
@@ -164,7 +164,7 @@ Rcpp::NumericVector eval_fg_parts_affine_cpp(const Rcpp::List& aff,
 // eval_fg_obj_affine_cpp
 //
 // Norm (L1/L2) of the affine components, standardized by sqrt(p).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double eval_fg_obj_affine_cpp(const Rcpp::List& aff,
                               const arma::vec& theta,
                               const std::string& norm_min) {
@@ -196,7 +196,7 @@ double eval_fg_obj_affine_cpp(const Rcpp::List& aff,
 //   par        - theta coefficient (R vector WITHOUT dim)
 //   full_rank  - logical
 //   grad_norm  - norm of the gradient of the quadratic objective at the solution
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List solve_fg_theta_affine_cpp(const Rcpp::List& aff,
                                      const double rcond = 1e-10) {
   

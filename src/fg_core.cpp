@@ -137,7 +137,7 @@ arma::vec u2_parts(const arma::vec& theta,
 //   phi    - odd function: "identity" or "piecewise"
 //
 // Returns a numeric vector of length p (without a dim attribute).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta,
                                     const arma::vec& lt,
                                     const arma::vec& lq,
@@ -164,7 +164,7 @@ Rcpp::NumericVector U2_parts_fg_cpp(const arma::vec& theta,
 //   norm_min - minimization norm ("L1" or "L2")
 //
 // Returns a double scalar with the value of the objective function.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double U2_obj_fg_cpp(const arma::vec& theta,
                      const arma::vec& lt,
                      const arma::vec& lq,
